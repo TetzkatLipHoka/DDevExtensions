@@ -13,7 +13,12 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms,
-  Dialogs;
+  Dialogs
+  {$IF CompilerVersion > 30}
+  ,Vcl.Themes
+  ,Vcl.Styles
+  {$IFEND} 
+  ;
 
 type
   TFormBase = class(TForm)
@@ -25,6 +30,7 @@ type
   public
     { Public-Deklarationen }
     constructor Create(AOwner: TComponent); override;
+    procedure FormCreate(Sender: TObject);
     function ShowModal: Integer; override;
   end;
 
@@ -129,6 +135,21 @@ begin
 
   if Self.Font.Name <> 'Tahoma' then
     SetControlFonts(Self);
+end;
+
+procedure TFormBase.FormCreate(Sender: TObject);
+{$IF CompilerVersion > 33.0} // MS 30
+var
+  sName: string;
+{$IFEND}  
+begin
+  {$IF CompilerVersion > 33.0} // 10.3 Rio+
+  for sName in TStyleManager.StyleNames do
+  begin
+    if sName.StartsWith('Win10IDE_') then
+      self.StyleName := sName;
+  end;
+  {$IFEND}
 end;
 
 function TFormBase.ShowModal: Integer;

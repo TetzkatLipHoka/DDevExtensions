@@ -289,7 +289,7 @@ echo.
 :D2009
 echo.
 echo === Delphi 2009 ============================
-call "C:\CodeGear\RAD Studio\6.0\bin\rsvars.bat"
+call "C:\Program Files (x86)\CodeGear\RAD Studio\6.0\bin\rsvars.bat"
 
 cd D_2009
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj

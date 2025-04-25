@@ -1,9 +1,9 @@
 object FormBase: TFormBase
   Left = 192
   Top = 114
+  Width = 493
+  Height = 341
   Caption = 'FormBase'
-  ClientHeight = 302
-  ClientWidth = 477
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -11,7 +11,7 @@ object FormBase: TFormBase
   Font.Name = 'Tahoma'
   Font.Style = []
   OldCreateOrder = False
-  PixelsPerInch = 96
   OnCreate = FormCreate
+  PixelsPerInch = 96
   TextHeight = 13
 end

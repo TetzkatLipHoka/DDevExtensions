@@ -303,7 +303,7 @@ var
   stringInfoStream : TMemoryStream;
   strg : TVersionStringValue;
   i, p, p1 : Integer;
-  wValue : UnicodeString;
+  wValue : {$IFDEF UNICODE}UnicodeString{$ELSE}WideString{$ENDIF};
 
   procedure PadStream (strm : TStream);
   begin
@@ -313,7 +313,7 @@ var
 
   procedure SaveVersionHeader (strm : TStream; wLength, wValueLength, wType : word; const key : string; const value);
   var
-    wKey : UnicodeString;
+    wKey : {$IFDEF UNICODE}UnicodeString{$ELSE}WideString{$ENDIF};
     valueLen : word;
     keyLen : word;
   begin

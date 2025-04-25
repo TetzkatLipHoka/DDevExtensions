@@ -98,7 +98,7 @@ begin
   finally
     SetVirtualMethod(TReader, Index, @NewInst);
   end;
-  Font.Name := UTF8ToString(DefFontData.Name);
+  Font.Name := {$IFDEF UNICODE}UTF8ToString{$ENDIF}(DefFontData.Name);
   Font.Height := DefFontData.Height;
 end;
 

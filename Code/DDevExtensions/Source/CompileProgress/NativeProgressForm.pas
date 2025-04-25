@@ -488,11 +488,22 @@ begin
 //    for I := 0 to Form.ComponentCount - 1 do
 //      WriteLn(Form.Components[I].Name + ': ' + Form.Components[I].ClassName);
 
-    pnErrors := Form.FindComponent('pnErrors') as TControl;
-    // In Delphi 11.1 the ProgressBar must be placed below the "Hints" panel:
-    {$IF declared(RTLVersion111)}{$IF RTLVersion111}
+    // In Delphi 11.1+ the ProgressBar must be placed below the "Hints" panel:
+    {$IF CompilerVersion >= 36} // 12+
     pnErrors := Form.FindComponent('pnHints') as TControl;
-    {$IFEND}{$IFEND}
+    
+    {$ELSEIF CompilerVersion = 35} // 11
+    pnErrors := Form.FindComponent('pnErrors') as TControl;    
+    {$IF declared(RTLVersion111)}
+      {$IF RTLVersion111}
+      pnErrors := Form.FindComponent('pnHints') as TControl;
+      {$IFEND}
+    {$IFEND} 
+    
+    {$ELSE} // <11
+    pnErrors := Form.FindComponent('pnErrors') as TControl;
+    {$IFEND}
+    
     TotalLines := GetLabel('TotalLines');
     if (pnErrors is TPanel) and (TotalLines <> nil) then
     begin

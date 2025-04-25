@@ -5,7 +5,7 @@ DDevExtensions adds new features to RAD Studio.
 
 Supported Delphi Versions 2009-12
 
-## Releases Delphi 2009-10.4
+## Releases Delphi 2009-12
 
 Until there are new releases the releases are still available at
 https://www.idefixpack.de/ddev
@@ -45,6 +45,7 @@ Start the InstallDDevExtensions.exe and press the <Uninstall> button.
 - Increment Build Number only when building the project (default: on) [2010 only]
 - Set TLabel.Margins.Bottom to zero (default: on)
 - Remove Explicit* properties (default: off)
+- Remove TDataModule.PixelsPerInch property (default: off) [Delphi 11+]
 - Component Selector (default: off, no hotkey)
 - Disable “Source has been modified. Rebuild?” (default: on)
 - Auto-save editor files after successful compile (default: off)

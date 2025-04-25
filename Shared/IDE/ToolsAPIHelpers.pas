@@ -13,7 +13,10 @@ interface
 
 uses
   Windows, SysUtils, Classes, Contnrs, ToolsAPI, Controls, ActnList,
-  CategoryButtons, PaletteAPI,
+  CategoryButtons,
+  {$IF CompilerVersion >= 21.0} // Delphi 2009
+  PaletteAPI,
+  {$IFEND}
   {$IF CompilerVersion >= 23.0} // XE2+
   PlatformAPI,
   {$IFEND}

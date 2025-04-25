@@ -1,6 +1,8 @@
 Version: 2.90
 =============
 - Added: Support for Delphi 12.0
+- Added: TDataModule.PixelsPerInch property remover (Delphi 11 and newer)
+- Added: IDE-Theme
 
 Version: 2.89
 =============

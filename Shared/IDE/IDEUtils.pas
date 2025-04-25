@@ -433,20 +433,20 @@ begin
   Result := nil;
   if Intf <> nil then
   begin
-    P := PEntry(Pointer(PByte(Pointer(Intf)^) + VmtOffset)^);
+    P := PEntry(Pointer(PAnsiChar(Pointer(Intf)^) + VmtOffset)^);
     if P <> nil then
     begin
       // stdcall, safecall, cdecl, pascal:
       if P^.AddArgShort = $04244483 then
-        Result := PByte(@P^.ShortJmpOffset) + SizeOf(Integer) + P^.ShortJmpOffset
+        Result := PAnsiChar(@P^.ShortJmpOffset) + SizeOf(Integer) + P^.ShortJmpOffset
       else if P^.AddArgLong = $04244481 then
-        Result := PByte(@P^.LongJmpOffset) + SizeOf(Integer) + P^.LongJmpOffset
+        Result := PAnsiChar(@P^.LongJmpOffset) + SizeOf(Integer) + P^.LongJmpOffset
 
       // register:
       else if P^.RegAddArgShort = $C083 then
-        Result := PByte(@P^.RegShortJmpOffset) + SizeOf(Integer) + P^.RegShortJmpOffset
+        Result := PAnsiChar(@P^.RegShortJmpOffset) + SizeOf(Integer) + P^.RegShortJmpOffset
       else if P^.RegAddArgLong = $05 then
-        Result := PByte(@P^.RegLongJmpOffset) + SizeOf(Integer) + P^.RegLongJmpOffset
+        Result := PAnsiChar(@P^.RegLongJmpOffset) + SizeOf(Integer) + P^.RegLongJmpOffset
       ;
     end;
   end;

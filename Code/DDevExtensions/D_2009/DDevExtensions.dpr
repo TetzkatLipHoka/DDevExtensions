@@ -8,9 +8,6 @@
 
 library DDevExtensions;
 
-{$WEAKLINKRTTI ON}
-{$RTTI EXPLICIT METHODS([]) PROPERTIES([]) FIELDS([])}
-
 {$LIBSUFFIX '2009'}
 
 {$I ..\Source\DelphiExtension.inc}
@@ -96,7 +93,9 @@ uses
   DocModuleHandler in '..\Source\Editor\DocModuleHandler.pas',
   CodeInsightHandling in '..\Source\Editor\CodeInsightHandling.pas',
   DisableAlphaSortClassCompletion in '..\Source\DSUFeatures\DisableAlphaSortClassCompletion.pas',
-  RemovePixelsPerInchProperty in '..\Source\FormDesignerHelpers\RemovePixelsPerInchProperty.pas';
+  RemoveTextHeightProperty in '..\Source\FormDesignerHelpers\RemoveTextHeightProperty.pas',
+  RemovePixelsPerInchProperty in '..\Source\FormDesignerHelpers\RemovePixelsPerInchProperty.pas',
+  FixAlphaControlsPNG in '..\Source\FormDesignerHelpers\FixAlphaControlsPNG.pas';
 
 var
   AboutBoxServices: IOTAAboutBoxServices = nil;

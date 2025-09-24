@@ -509,7 +509,9 @@ begin
     begin
       X := Form.ScreenToClient(pnErrors.ClientToScreen(Point(0, 0))).X;
       Y := Form.ScreenToClient(TotalLines.ClientToScreen(Point(TotalLines.Top, 0))).Y;
-      FProgressBar.ScaleForPPI(Form.CurrentPPI);
+      {$IF CompilerVersion >= 35}
+      FProgressBar.ScaleForPPI(Form.CurrentPPI); // adjust for scaled dialog
+      {$IFEND}
       FProgressBar.SetBounds(X, Y + 2, pnErrors.Width, TotalLines.Height div 2);
     end
     else // Fallback

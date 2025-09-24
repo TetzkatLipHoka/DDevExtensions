@@ -20,7 +20,6 @@ type
   TVSTGetTextEvent = procedure(Sender: TObject; Node: PVirtualNode; Column: Integer;
     TextType: TVSTTextType; var CellText: WideString) of object;
 
-
   TreeMethod = class(TCustomAttribute)
   end;
 

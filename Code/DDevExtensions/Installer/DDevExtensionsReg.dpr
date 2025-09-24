@@ -7,6 +7,8 @@ program DDevExtensionsReg;
 {$RTTI EXPLICIT METHODS([]) PROPERTIES([]) FIELDS([])}
 {$IFEND}
 
+{$R 'manifest.res' 'manifest.rc'}
+
 uses
   Forms,
   {$IF CompilerVersion > 30}

@@ -1,8 +1,10 @@
 Version: 2.90
 =============
 - Added: Support for Delphi 12.0
+- Added: Support for Delphi 13.0
 - Added: TDataModule.PixelsPerInch property remover (Delphi 11 and newer)
 - Added: IDE-Theme
+- Added: TPNGGraphic (acPNG) to TPngImage converter (2009 and newer)
 
 Version: 2.89
 =============

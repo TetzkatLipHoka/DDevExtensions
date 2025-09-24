@@ -54,6 +54,7 @@ del /Q /S D_D103\lib\*.dcu >NUL
 del /Q /S D_D104\lib\*.dcu >NUL
 del /Q /S D_D110\lib\*.dcu >NUL
 del /Q /S D_D120\lib\*.dcu >NUL
+del /Q /S D_D130\lib\*.dcu >NUL
 
 if "%1-" == "clean-" goto :EOF
 
@@ -77,10 +78,25 @@ echo.
 
 ::BUILD
 
+:D130
+echo.
+echo === Delphi 13.0 ==============================
+call "C:\Program Files (x86)\Embarcadero\Studio\37.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto D120
+
+cd D_D130
+msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
+if ERRORLEVEL 1 goto Error1
+cd ..
+if exist "%LINKMAPFILE%" "%LINKMAPFILE%" bin\DDevExtensionsD130.dll
+del bin\DDevExtensionsD130.map bin\DDevExtensions.drc
+echo.
+
 :D120
 echo.
 echo === Delphi 12.0 ==============================
 call "C:\Program Files (x86)\Embarcadero\Studio\23.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto D110
 
 cd D_D120
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -94,6 +110,7 @@ echo.
 echo.
 echo === Delphi 11.0 ==============================
 call "C:\Program Files (x86)\Embarcadero\Studio\22.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto D104
 
 cd D_D110
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -107,6 +124,7 @@ echo.
 echo.
 echo === Delphi 10.4 ==============================
 call "C:\Program Files (x86)\Embarcadero\Studio\21.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto D103
 
 cd D_D104
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -120,6 +138,7 @@ echo.
 echo.
 echo === Delphi 10.3 ==============================
 call "C:\Program Files (x86)\Embarcadero\Studio\20.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto D102
 
 cd D_D103
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -133,6 +152,7 @@ echo.
 echo.
 echo === Delphi 10.2 ==============================
 call "C:\Program Files (x86)\Embarcadero\Studio\19.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto D101
 
 cd D_D102
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -146,6 +166,7 @@ echo.
 echo.
 echo === Delphi 10.1 Berlin ==============================
 call "C:\Program Files (x86)\Embarcadero\Studio\18.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto D10
 
 cd D_D101
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -159,6 +180,7 @@ echo.
 echo.
 echo === Delphi 10 Seattle ==============================
 call "C:\Program Files (x86)\Embarcadero\Studio\17.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto DXE8
 
 cd D_D10
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -172,6 +194,7 @@ echo.
 echo.
 echo === Delphi XE8 ==============================
 call "C:\Program Files (x86)\Embarcadero\Studio\16.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto DXE7
 
 cd D_XE8
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -185,6 +208,7 @@ echo.
 echo.
 echo === Delphi XE7 ==============================
 call "C:\Program Files (x86)\Embarcadero\Studio\15.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto DXE6
 
 cd D_XE7
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -198,6 +222,7 @@ echo.
 echo.
 echo === Delphi XE6 ==============================
 call "C:\Program Files (x86)\Embarcadero\Studio\14.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto DXE5
 
 cd D_XE6
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -211,6 +236,7 @@ echo.
 echo.
 echo === Delphi XE5 ==============================
 call "C:\Program Files (x86)\Embarcadero\RAD Studio\12.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto DXE4
 
 cd D_XE5
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -224,6 +250,7 @@ echo.
 echo.
 echo === Delphi XE4 ==============================
 call "C:\Program Files (x86)\Embarcadero\RAD Studio\11.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto DXE3
 
 cd D_XE4
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -237,6 +264,7 @@ echo.
 echo.
 echo === Delphi XE3 ==============================
 call "C:\Program Files (x86)\Embarcadero\RAD Studio\10.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto DXE2
 
 cd D_XE3
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -250,6 +278,7 @@ echo.
 echo.
 echo === Delphi XE2 ==============================
 call "C:\Program Files (x86)\Embarcadero\RAD Studio\9.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto DXE
 
 cd D_XE2
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -263,6 +292,7 @@ echo.
 echo.
 echo === Delphi XE ==============================
 call "C:\Program Files (x86)\Embarcadero\RAD Studio\8.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto D2010
 
 cd D_XE
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -276,6 +306,7 @@ echo.
 echo.
 echo === Delphi 2010 ============================
 call "C:\Program Files (x86)\Embarcadero\RAD Studio\7.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto D2009
 
 cd D_2010
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -290,6 +321,7 @@ echo.
 echo.
 echo === Delphi 2009 ============================
 call "C:\Program Files (x86)\CodeGear\RAD Studio\6.0\bin\rsvars.bat"
+::if ERRORLEVEL 1 goto D
 
 cd D_2009
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -302,6 +334,8 @@ echo.
 
 
 echo === Packaging ==============================
+echo Press to continue
+pause
 
 echo DDevExtensions Version %majorversion%.%minorversion%>bin\Version.txt
 if "%fileversion%#" == "Dev#" echo %versioninfo%>>bin\Version.txt

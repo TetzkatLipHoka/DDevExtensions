@@ -6,18 +6,18 @@ unit RemovePixelsPerInchProperty;
 
 interface
 
-{$IFDEF COMPILER110_UP}
+{$IFDEF COMPILER28_UP}
 
 uses
   SysUtils, Classes, Forms, Controls, IDEHooks, Hooking;
 
 procedure SetRemovePixelsPerInchPropertyActive(Active: Boolean);
 
-{$ENDIF COMPILER110_UP}
+{$ENDIF COMPILER28_UP}
 
 implementation
 
-{$IFDEF COMPILER110_UP}
+{$IFDEF COMPILER28_UP}
 
 uses
 //  CodeSiteLogging,
@@ -101,11 +101,11 @@ begin
     Filer.DefineProperty('PixelsPerInch', ReadPixelsPerInch, WritePixelsPerInch, (csReading in ComponentState));
   end;
 
-{$IF CompilerVersion > 35}
+{$IF CompilerVersion > 37}
   Check if anything changed in System.Classes.TDataModule.DefineProperties
 {$IFEND}
 end;
 
-{$ENDIF COMPILER110_UP}
+{$ENDIF COMPILER28_UP}
 
 end.

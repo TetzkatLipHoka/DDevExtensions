@@ -11,7 +11,7 @@ library DDevExtensions;
 {$WEAKLINKRTTI ON}
 {$RTTI EXPLICIT METHODS([]) PROPERTIES([]) FIELDS([])}
 
-{$LIBSUFFIX '2010'}
+{$LIBSUFFIX 'D130'}
 
 {$I ..\Source\DelphiExtension.inc}
 
@@ -82,9 +82,6 @@ uses
   StrucViewSearch in '..\Source\DSUFeatures\StrucViewSearch.pas',
   EditPopupCtrl in '..\Source\EditPopupCtrl.pas',
   VirtTreeHandler in '..\Source\VirtTreeHandler.pas',
-  OldPalette in '..\Source\OldPalette\OldPalette.pas',
-  FrmeOptionPageOldPalette in '..\Source\OldPalette\FrmeOptionPageOldPalette.pas',
-  ComponentPanel in '..\Source\OldPalette\ComponentPanel.pas',
   ImportHooking in '..\..\..\Shared\ImportHooking.pas',
   StartParameterClasses in '..\Source\StartParameterManager\StartParameterClasses.pas',
   StartParameterCtrl in '..\Source\StartParameterManager\StartParameterCtrl.pas',

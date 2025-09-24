@@ -1,9 +1,11 @@
 inherited FrameOptionPageUnitSelector: TFrameOptionPageUnitSelector
   Height = 187
   TabStop = True
+  ExplicitHeight = 187
   inherited pnlClient: TPanel
     Height = 138
     TabOrder = 1
+    ExplicitHeight = 138
     object lblFindUseUnitHotKey: TLabel
       Left = 8
       Top = 31
@@ -43,6 +45,7 @@ inherited FrameOptionPageUnitSelector: TFrameOptionPageUnitSelector
     inherited lblDescription: TLabel
       Width = 253
       Caption = 'Configure the Unit Selector and Find/Use Unit dialog.'
+      ExplicitWidth = 253
     end
   end
 end

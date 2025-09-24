@@ -23,11 +23,15 @@ type
     FActive: Boolean;
     FLabelMargin: Boolean;
     FRemoveExplicitProperty: Boolean;    
-    FRemovePixelsPerInchProperty: Boolean;    
+    FRemovePixelsPerInchProperty: Boolean;
+    FRemoveTextHeightProperty: Boolean;
+    FFixAlphaControlsPNG: Boolean;
     procedure SetActive(const Value: Boolean);
     procedure SetLabelMargin(const Value: Boolean);
     procedure SetRemoveExplicitProperty(const Value: Boolean);
     procedure SetRemovePixelsPerInchProperty(const Value: Boolean);
+    procedure SetRemoveTextHeightProperty(const Value: Boolean);
+    procedure SetFixAlphaControlsPNG(const Value: Boolean);
   protected
     function GetOptionPages: TTreePage; override;
     procedure Init; override;
@@ -40,6 +44,8 @@ type
     property LabelMargin: Boolean read FLabelMargin write SetLabelMargin;
     property RemoveExplicitProperty: Boolean read FRemoveExplicitProperty write SetRemoveExplicitProperty;
     property RemovePixelsPerInchProperty : Boolean read FRemovePixelsPerInchProperty write SetRemovePixelsPerInchProperty;
+    property RemoveTextHeightProperty: Boolean read FRemoveTextHeightProperty write SetRemoveTextHeightProperty;
+    property FixAlphaControlsPNG : Boolean read FFixAlphaControlsPNG write SetFixAlphaControlsPNG;
   end;
 
   TFrameOptionPageFormDesigner = class(TFrameBase, ITreePageComponent)
@@ -47,6 +53,8 @@ type
     cbxLabelMargin: TCheckBox;
     chkRemoveExplicitProperties: TCheckBox;
     chkRemovePixelsPerInchProperties: TCheckBox;
+    chkRemoveTextHeightProperty: TCheckBox;
+    chkFixAlphaControlsPNG: TCheckBox;
     procedure cbxActiveClick(Sender: TObject);
   private
     { Private-Deklarationen }
@@ -70,8 +78,10 @@ implementation
 
 uses
   Main, LabelMarginHelper,
-  {$IFDEF COMPILER110_UP}RemovePixelsPerInchProperty,{$ENDIF}  
-  RemoveExplicitProperty;
+  {$IFDEF COMPILER12_UP}FixAlphaControlsPNG,{$ENDIF}
+  {$IFDEF DELPHI28_UP}RemovePixelsPerInchProperty,{$ENDIF}
+  RemoveExplicitProperty,
+  RemoveTextHeightProperty;
 
 {$R *.dfm}
 
@@ -96,7 +106,7 @@ procedure TFrameOptionPageFormDesigner.cbxActiveClick(Sender: TObject);
 begin
   cbxLabelMargin.Enabled := cbxActive.Checked;
   chkRemoveExplicitProperties.Enabled := cbxActive.Checked;
-  chkRemovePixelsPerInchProperties.Enabled := {$IFDEF COMPILER110_UP}cbxActive.Checked{$ELSE}False;{$ENDIF};
+  chkRemovePixelsPerInchProperties.Enabled := {$IFDEF DELPHI28_UP}cbxActive.Checked{$ELSE}False;{$ENDIF};
 end;
 
 procedure TFrameOptionPageFormDesigner.SetUserData(UserData: TObject);
@@ -110,6 +120,7 @@ begin
   cbxLabelMargin.Checked := FFormDesigner.LabelMargin;
   chkRemoveExplicitProperties.Checked := FFormDesigner.RemoveExplicitProperty;
   chkRemovePixelsPerInchProperties.Checked := FFormDesigner.RemovePixelsPerInchProperty;
+  chkFixAlphaControlsPNG.Checked := FFormDesigner.FixAlphaControlsPNG;
 
   cbxActiveClick(cbxActive);
 end;
@@ -119,6 +130,8 @@ begin
   FFormDesigner.LabelMargin := cbxLabelMargin.Checked;
   FFormDesigner.RemoveExplicitProperty := chkRemoveExplicitProperties.Checked;
   FFormDesigner.RemovePixelsPerInchProperty := chkRemovePixelsPerInchProperties.Checked;
+  FFormDesigner.RemoveTextHeightProperty := chkRemoveTextHeightProperty.Checked;
+  FFormDesigner.FixAlphaControlsPNG := chkFixAlphaControlsPNG.Checked;
 
   FFormDesigner.Active := cbxActive.Checked;
   FFormDesigner.Save;
@@ -151,6 +164,8 @@ begin
   LabelMargin := True;
   RemoveExplicitProperty := False;
   RemovePixelsPerInchProperty := False;
+  RemoveTextHeightProperty := False;
+  FixAlphaControlsPNG := True;
   Active := True;
 end;
 
@@ -193,6 +208,26 @@ begin
   end;
 end;
 
+procedure TFormDesigner.SetRemoveTextHeightProperty(const Value: Boolean);
+begin
+  if Value <> FRemoveTextHeightProperty then
+  begin
+    FRemoveTextHeightProperty := Value;
+    if Active then
+      UpdateHooks;
+  end;
+end;
+
+procedure TFormDesigner.SetFixAlphaControlsPNG(const Value: Boolean);
+begin
+  if Value <> FFixAlphaControlsPNG then
+  begin
+    FFixAlphaControlsPNG := Value;
+    if Active then
+      UpdateHooks;
+  end;
+end;
+
 procedure TFormDesigner.UpdateHooks;
 begin
   {$IFDEF INCLUDE_FORMDESIGNER}
@@ -201,11 +236,16 @@ begin
   SetLabelMarginActive(Active and LabelMargin);
   SetRemoveExplicitPropertyActive(Active and RemoveExplicitProperty);
   {$ENDIF COMPILER10_UP}
+
+  {$IFDEF COMPILER12_UP}
+  SetFixAlphaControlsPNGActive(Active and FixAlphaControlsPNG);
+  {$ENDIF COMPILER12_UP}
   
-  {$IFDEF COMPILER110_UP}
+  {$IFDEF COMPILER28_UP}
   SetRemovePixelsPerInchPropertyActive(Active and RemovePixelsPerInchProperty);
-  {$ENDIF COMPILER110_UP}
-  
+  SetRemoveTextHeightPropertyActive(Active and RemoveTextHeightProperty);
+  {$ENDIF COMPILER28_UP}
+
   {$ENDIF INCLUDE_FORMDESIGNER}
 end;
 

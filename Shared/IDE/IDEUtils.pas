@@ -458,11 +458,10 @@ begin
 end;
 
 function DelphiInterfaceToObject(const Intf: IInterface): TObject;
-//{$IFDEF COMPILER14_UP}
-//begin
-//  Result := Intf as TObject;    uses QueryInterface which is slow and goes through all supported interfaces before matching with ObjCastGUID
-//end;
-//{$ELSE}
+{$IFDEF CPUX86}
+// x86: decode the compiler-generated interface adjustor thunk (add [esp+4]/eax, -offset;
+// jmp) to recover the object pointer behind the interface. The thunk machine code is
+// x86-specific; the x64 build uses the RTL cast instead (see {$ELSE} below).
 type
   PEntry = ^TEntry;
   TEntry = packed record
@@ -519,7 +518,21 @@ begin
     end;
   end;
 end;
-//{$ENDIF COMPILER14_UP}
+{$ELSE}
+begin
+  // x64: the x86 adjustor-thunk byte patterns don't apply. Use the RTL
+  // interface->object cast (ObjCast QueryInterface), correct for Delphi-object-backed
+  // interfaces (all IDE ToolsAPI interfaces are). Guarded so a non-castable interface
+  // yields nil instead of raising EIntfCastError, matching the x86 "unrecognized" path.
+  Result := nil;
+  if Intf <> nil then
+    try
+      Result := Intf as TObject;
+    except
+      Result := nil;
+    end;
+end;
+{$ENDIF CPUX86}
 
 {$IFDEF CPUX86}
 function IsObject(Address: Pointer): Boolean;

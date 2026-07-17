@@ -104,6 +104,43 @@ begin
   Result := OrgTDebugProjectOption_GetRunParams(Self);
 end;
 
+{$IFDEF CPUX64}
+// On Win64, a method returning a managed type (string) passes Self in RCX and the
+// hidden @Result in RDX. A plain "function(Self): string" instead puts @Result in RCX
+// and Self in RDX - swapping them and corrupting memory (the result string gets written
+// into the Self object). So the GetRunParams hook MUST be a real method to match the
+// convention of the hooked TDebugProjectOption.GetRunParams.
+type
+  TGetRunParamsMethod = function: string of object;
+
+  TDebugProjectOptionHook = class(TDebugProjectOption)
+    function HookedGetRunParams: string;
+  end;
+
+var
+  OrgGetRunParamsCode: Pointer; // trampoline (plain code address) to the original method
+
+function TDebugProjectOptionHook.HookedGetRunParams: string;
+var
+  m: TMethod;
+begin
+  if EnabledGetRunParamsRedirect then
+  begin
+    EnabledGetRunParamsRedirect := False;
+    try
+      if TStartParameterControl.GetActiveParams(Result, True) then
+        Exit;
+    except
+      Application.HandleException(Self);
+    end;
+  end;
+  // Call the original through the trampoline using the method convention.
+  m.Code := OrgGetRunParamsCode;
+  m.Data := Self;
+  Result := TGetRunParamsMethod(m)();
+end;
+{$ENDIF CPUX64}
+
 {$IF CompilerVersion <= 21.0} // Delphi 2009/2010
 function HookedCppTProjectOptions_GetRunParams(Self: TDebugProjectOption): string;
 begin
@@ -181,15 +218,14 @@ begin
   {$ELSE}
   @TDebugProjectOption_GetRunParams := GetTDebugProjectOption_GetRunParams;
   {$IFEND}
-  {$IFNDEF CPUX64}
-  // TODO(x64): RedirectOrgCall-based hooking of these debugger functions crashes the
-  // 64-bit IDE on debug start (EAccessViolation in @UStrClr under TDebugger.Run).
-  // Disabled on x64 until the x64 detour engine is fixed; Start Parameter injection
-  // is unavailable on the 64-bit IDE for now.
   @OrgTDebugger_Run := RedirectOrgCall(@TDebugger_Run, @HookedTDebugger_Run);
 
+  {$IFDEF CPUX86}
   @OrgTDebugProjectOption_GetRunParams := RedirectOrgCall(@TDebugProjectOption_GetRunParams, @HookedTDebugProjectOption_GetRunParams);
-  {$ENDIF ~CPUX64}
+  {$ELSE}
+  // Win64: hook with a method (correct Self/@Result register convention, see above).
+  OrgGetRunParamsCode := RedirectOrgCall(@TDebugProjectOption_GetRunParams, @TDebugProjectOptionHook.HookedGetRunParams);
+  {$ENDIF}
   {$IF CompilerVersion <= 21.0} // Delphi 2009/2010
   if GetModuleHandle(bcbide_bpl) <> 0 then
   begin
@@ -202,10 +238,12 @@ end;
 
 destructor TStartParameterManager.Destroy;
 begin
-  {$IFNDEF CPUX64}
   RestoreOrgCall(@TDebugger_Run, @OrgTDebugger_Run);
+  {$IFDEF CPUX86}
   RestoreOrgCall(@TDebugProjectOption_GetRunParams, @OrgTDebugProjectOption_GetRunParams);
-  {$ENDIF ~CPUX64}
+  {$ELSE}
+  RestoreOrgCall(@TDebugProjectOption_GetRunParams, OrgGetRunParamsCode);
+  {$ENDIF}
   {$IF CompilerVersion <= 21.0} // Delphi 2009/2010
   if Assigned(CppTProjectOptions_GetRunParams) then
     RedirectOrgCall(@CppTProjectOptions_GetRunParams, @OrgCppTProjectOptions_GetRunParams);

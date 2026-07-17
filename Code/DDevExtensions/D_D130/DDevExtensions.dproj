@@ -4,7 +4,7 @@
         <MainSource>DDevExtensions.dpr</MainSource>
         <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
         <DCC_DCCCompiler>DCC32</DCC_DCCCompiler>
-        <DCC_DependencyCheckOutputName>..\bin\DDevExtensionsD130.dll</DCC_DependencyCheckOutputName>
+        <DCC_DependencyCheckOutputName>..\bin\$(Platform)\DDevExtensionsD130.dll</DCC_DependencyCheckOutputName>
         <ProjectVersion>20.1</ProjectVersion>
         <Config Condition="'$(Config)'==''">Release</Config>
         <Basis>True</Basis>
@@ -12,7 +12,7 @@
         <FrameworkType>VCL</FrameworkType>
         <Base>True</Base>
         <Platform Condition="'$(Platform)'==''">Win32</Platform>
-        <TargetedPlatforms>1</TargetedPlatforms>
+        <TargetedPlatforms>3</TargetedPlatforms>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -58,12 +58,12 @@
         <DllSuffix>D130</DllSuffix>
         <DCC_StringChecks>off</DCC_StringChecks>
         <DCC_SYMBOL_PLATFORM>false</DCC_SYMBOL_PLATFORM>
-        <DCC_ExeOutput>..\bin</DCC_ExeOutput>
+        <DCC_ExeOutput>..\bin\$(Platform)</DCC_ExeOutput>
         <DCC_ImageBase>53900000</DCC_ImageBase>
-        <DCC_DcuOutput>lib</DCC_DcuOutput>
+        <DCC_DcuOutput>lib\$(Platform)</DCC_DcuOutput>
         <UsePackages>true</UsePackages>
         <DCC_WIDECHAR_REDUCED>false</DCC_WIDECHAR_REDUCED>
-        <DCC_DependencyCheckOutputName>..\bin\DDevExtensionsD130.dll</DCC_DependencyCheckOutputName>
+        <DCC_DependencyCheckOutputName>..\bin\$(Platform)\DDevExtensionsD130.dll</DCC_DependencyCheckOutputName>
         <GenDll>true</GenDll>
         <DCC_UsePackage>vcl;rtl;designide;$(DCC_UsePackage)</DCC_UsePackage>
     </PropertyGroup>
@@ -71,7 +71,7 @@
         <Debugger_RunParams>-rBDSPlain -pDelphi</Debugger_RunParams>
         <Debugger_LoadUnspecifiedSymbols>true</Debugger_LoadUnspecifiedSymbols>
         <DCC_Namespace>Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
-        <PreBuildEvent><![CDATA[copy /Y "$(PROJECTDIR)\..\..\..\CompileInterceptor\Bin\CompileInterceptorW.dll" "$(OUTPUTDIR)"
+        <PreBuildEvent><![CDATA[copy /Y "$(PROJECTDIR)\..\..\..\CompileInterceptor\Bin\$(Platform)\CompileInterceptorW.dll" "$(OUTPUTDIR)"
 $(PreBuildEvent)]]></PreBuildEvent>
         <Debugger_LoadAllSymbols>false</Debugger_LoadAllSymbols>
         <Debugger_HostApplication>$(BDS)\Bin\bds.exe</Debugger_HostApplication>
@@ -82,8 +82,8 @@ $(PreBuildEvent)]]></PreBuildEvent>
         <DCC_DebugInformation>0</DCC_DebugInformation>
         <DCC_LocalDebugSymbols>False</DCC_LocalDebugSymbols>
         <DCC_SymbolReferenceInfo>0</DCC_SymbolReferenceInfo>
-        <DCC_ObjOutput>lib</DCC_ObjOutput>
-        <DCC_HppOutput>lib</DCC_HppOutput>
+        <DCC_ObjOutput>lib\$(Platform)</DCC_ObjOutput>
+        <DCC_HppOutput>lib\$(Platform)</DCC_HppOutput>
         <DCC_ResourcePath>OldPalette;$(DCC_ResourcePath)</DCC_ResourcePath>
         <DCC_ObjPath>OldPalette;$(DCC_ObjPath)</DCC_ObjPath>
         <DCC_IncludePath>OldPalette;$(DCC_IncludePath)</DCC_IncludePath>
@@ -93,14 +93,14 @@ $(PreBuildEvent)]]></PreBuildEvent>
         <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2)'!=''">
-        <DCC_DcuOutput>lib\debug</DCC_DcuOutput>
+        <DCC_DcuOutput>lib\$(Platform)\debug</DCC_DcuOutput>
         <MapFile>3</MapFile>
         <ILINK_MapFileType>DetailedSegments</ILINK_MapFileType>
         <DCC_DebugDCUs>true</DCC_DebugDCUs>
         <Version>7.0</Version>
         <DCC_MapFile>3</DCC_MapFile>
-        <DCC_ObjOutput>lib</DCC_ObjOutput>
-        <DCC_HppOutput>lib</DCC_HppOutput>
+        <DCC_ObjOutput>lib\$(Platform)</DCC_ObjOutput>
+        <DCC_HppOutput>lib\$(Platform)</DCC_HppOutput>
         <DCC_ResourcePath>OldPalette;$(DCC_ResourcePath)</DCC_ResourcePath>
         <DCC_ObjPath>OldPalette;$(DCC_ObjPath)</DCC_ObjPath>
         <DCC_IncludePath>OldPalette;$(DCC_IncludePath)</DCC_IncludePath>
@@ -160,7 +160,7 @@ $(PreBuildEvent)]]></PreBuildEvent>
             <ModelSupport>False</ModelSupport>
             <Platforms>
                 <Platform value="Win32">True</Platform>
-                <Platform value="Win64">False</Platform>
+                <Platform value="Win64">True</Platform>
             </Platforms>
         </BorlandProject>
         <ProjectFileVersion>12</ProjectFileVersion>
@@ -303,7 +303,7 @@ $(PreBuildEvent)]]></PreBuildEvent>
     <Import Condition="Exists('$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj')" Project="$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj"/>
     <Import Project="$(MSBuildProjectName).deployproj" Condition="Exists('$(MSBuildProjectName).deployproj')"/>
     <PropertyGroup Condition="'$(Config)'=='Release' And '$(Platform)'=='Win32'">
-        <PreBuildEvent>copy /Y &quot;$(PROJECTDIR)\..\..\..\CompileInterceptor\Bin\CompileInterceptorW.dll&quot; &quot;$(OUTPUTDIR)&quot;</PreBuildEvent>
+        <PreBuildEvent>copy /Y &quot;$(PROJECTDIR)\..\..\..\CompileInterceptor\Bin\$(Platform)\CompileInterceptorW.dll&quot; &quot;$(OUTPUTDIR)&quot;</PreBuildEvent>
         <PreBuildEventIgnoreExitCode>False</PreBuildEventIgnoreExitCode>
         <PreLinkEvent/>
         <PreLinkEventIgnoreExitCode>False</PreLinkEventIgnoreExitCode>
@@ -311,7 +311,7 @@ $(PreBuildEvent)]]></PreBuildEvent>
         <PostBuildEventIgnoreExitCode>False</PostBuildEventIgnoreExitCode>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Debug' And '$(Platform)'=='Win32'">
-        <PreBuildEvent>copy /Y &quot;$(PROJECTDIR)\..\..\..\CompileInterceptor\Bin\CompileInterceptorW.dll&quot; &quot;$(OUTPUTDIR)&quot;</PreBuildEvent>
+        <PreBuildEvent>copy /Y &quot;$(PROJECTDIR)\..\..\..\CompileInterceptor\Bin\$(Platform)\CompileInterceptorW.dll&quot; &quot;$(OUTPUTDIR)&quot;</PreBuildEvent>
         <PreBuildEventIgnoreExitCode>False</PreBuildEventIgnoreExitCode>
         <PreLinkEvent/>
         <PreLinkEventIgnoreExitCode>False</PreLinkEventIgnoreExitCode>

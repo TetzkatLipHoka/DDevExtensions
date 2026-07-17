@@ -197,7 +197,7 @@ function DelphiInterfaceToObject(const Intf: IInterface): TObject;
 function GetQueryInterfaceImplFromDelphiInterface(const Intf: IInterface): Pointer;
 function GetMethodImplFromDelphiInterface(const Intf: IInterface; VmtOffset: Integer): Pointer;
 function FindObjectField(Obj: TObject; const AClassName: string; FindLast: Boolean = False): TObject;
-function FindObjectFieldOffset(Obj: TObject; const AClassName: string; FindLast: Boolean): Cardinal; // Result=0 => not found
+function FindObjectFieldOffset(Obj: TObject; const AClassName: string; FindLast: Boolean): {$IFDEF CPUX64}NativeUInt{$ELSE}Cardinal{$ENDIF}; // Result=0 => not found
 
 function VarToIntDef(const V: Variant; Default: Integer): Integer;
 function VarToBoolDef(const V: Variant; Default: Boolean): Boolean;
@@ -521,6 +521,7 @@ begin
 end;
 //{$ENDIF COMPILER14_UP}
 
+{$IFDEF CPUX86}
 function IsObject(Address: Pointer): Boolean;
 asm
         MOV     EAX, [Address]
@@ -532,6 +533,22 @@ asm
         MOV     Result, False
 @Exit:
 end;
+{$ELSE}
+function IsObject(Address: Pointer): Boolean;
+var
+  ClassPtr: Pointer;
+begin
+  // x64 port of the asm above: an object instance's first slot is its class
+  // pointer, and for a genuine class [VMT + vmtSelfPtr] points back at the VMT.
+  Result := False;
+  if Address <> nil then
+  begin
+    ClassPtr := PPointer(Address)^;
+    if ClassPtr <> nil then
+      Result := PPointer(PByte(ClassPtr) + vmtSelfPtr)^ = ClassPtr;
+  end;
+end;
+{$ENDIF}
 
 function ClassIsOfClass(AClass: TClass; const AClassName: string): Boolean;
 begin
@@ -541,9 +558,9 @@ begin
     Result := False;
 end;
 
-function FindObjectFieldOffset(Obj: TObject; const AClassName: string; FindLast: Boolean): Cardinal;
+function FindObjectFieldOffset(Obj: TObject; const AClassName: string; FindLast: Boolean): {$IFDEF CPUX64}NativeUInt{$ELSE}Cardinal{$ENDIF};
 var
-  InstSize: Cardinal;
+  InstSize: {$IFDEF CPUX64}NativeUInt{$ELSE}Cardinal{$ENDIF};
   Field: TObject;
 begin
   if Obj <> nil then
@@ -554,8 +571,8 @@ begin
       while Result > SizeOf(Pointer) do // omit VMT
       begin
         try
-          Field := TObject(Pointer(Cardinal(Obj) + Result)^);
-          if (Cardinal(Field) >= $00010000) and
+          Field := TObject(PPointer(PByte(Obj) + Result)^);
+          if (NativeUInt(Field) >= $00010000) and
              not IsBadReadPtr(Field, SizeOf(TClass)) and
              not IsBadReadPtr(PPointer(Field)^, {TObject.InstanceSize} SizeOf(Pointer)) and
              not IsBadReadPtr(Pointer(INT_PTR(PPointer(Field)^) + vmtSelfPtr), SizeOf(Pointer)) and
@@ -574,8 +591,8 @@ begin
       while Result < InstSize do
       begin
         try
-          Field := TObject(Pointer(Cardinal(Obj) + Result)^);
-          if (Cardinal(Field) >= $00010000) and
+          Field := TObject(PPointer(PByte(Obj) + Result)^);
+          if (NativeUInt(Field) >= $00010000) and
              not IsBadReadPtr(Field, SizeOf(TClass)) and
              not IsBadReadPtr(PPointer(Field)^, {TObject.InstanceSize} SizeOf(Pointer)) and
              not IsBadReadPtr(Pointer(INT_PTR(PPointer(Field)^) + vmtSelfPtr), SizeOf(Pointer)) and
@@ -593,13 +610,13 @@ end;
 
 function FindObjectField(Obj: TObject; const AClassName: string; FindLast: Boolean): TObject;
 var
-  Offset: Cardinal;
+  Offset: {$IFDEF CPUX64}NativeUInt{$ELSE}Cardinal{$ENDIF};
 begin
   Offset := FindObjectFieldOffset(Obj, AClassName, FindLast);
   if Offset = 0 then
     raise Exception.CreateFmt('%s object field not found', [AClassName])
   else
-    Result := TObject(Pointer(Cardinal(Obj) + Offset)^);
+    Result := TObject(PPointer(PByte(Obj) + Offset)^);
 end;
 
 function MakeNotifyEvent(Data, Code: Pointer): TNotifyEvent;
@@ -657,6 +674,7 @@ begin
   end;
 end;
 
+{$IFDEF CPUX86}
 function HashString(const AItem: string): Integer;
 asm
   test eax, eax
@@ -688,6 +706,31 @@ asm
   and eax, MaxBucketItems-1
 @@Leave:
 end;
+{$ENDIF CPUX86}
+
+{$IFDEF CPUX64}
+function HashString(const AItem: string): Integer;
+var
+  I, Len: Integer;
+  C: Word;
+begin
+  if AItem = '' then
+  begin
+    Result := 0;
+    Exit;
+  end;
+  Len := Length(AItem);
+  Result := Len;
+  for I := 1 to Len do
+  begin
+    C := Word(AItem[I]);
+    Result := Result + C;
+    if C = 0 then
+      Break;
+  end;
+  Result := Result and (MaxBucketItems - 1);
+end;
+{$ENDIF CPUX64}
 
 { TStringIntegerHash }
 
@@ -710,7 +753,7 @@ begin
       while P <> nil do
       begin
         N := P.Next;
-        if (Cardinal(P) < Cardinal(@FCacheItems[0])) or (Cardinal(P) > Cardinal(@FCacheItems[High(FCacheItems)])) then
+        if (NativeUInt(P) < NativeUInt(@FCacheItems[0])) or (NativeUInt(P) > NativeUInt(@FCacheItems[High(FCacheItems)])) then
           Dispose(P);
         P := N;
         Dec(FCount);
@@ -761,7 +804,7 @@ begin
     begin
       Result := N.Value;
       P := N.Next;
-      if (Cardinal(N) < Cardinal(@FCacheItems[0])) or (Cardinal(N) > Cardinal(@FCacheItems[High(FCacheItems)])) then
+      if (NativeUInt(N) < NativeUInt(@FCacheItems[0])) or (NativeUInt(N) > NativeUInt(@FCacheItems[High(FCacheItems)])) then
         Dispose(N);
       FItems[Index] := P;
       Dec(FCount);
@@ -777,7 +820,7 @@ begin
         begin
           Result := N.Value;
           P.Next := N.Next;
-          if (Cardinal(N) < Cardinal(@FCacheItems[0])) or (Cardinal(N) > Cardinal(@FCacheItems[High(FCacheItems)])) then
+          if (NativeUInt(N) < NativeUInt(@FCacheItems[0])) or (NativeUInt(N) > NativeUInt(@FCacheItems[High(FCacheItems)])) then
             Dispose(N);
           Dec(FCount);
           Exit;
@@ -881,7 +924,7 @@ begin
       while P <> nil do
       begin
         N := P.Next;
-        if (Cardinal(P) < Cardinal(@FCacheItems[0])) or (Cardinal(P) > Cardinal(@FCacheItems[High(FCacheItems)])) then
+        if (NativeUInt(P) < NativeUInt(@FCacheItems[0])) or (NativeUInt(P) > NativeUInt(@FCacheItems[High(FCacheItems)])) then
           Dispose(P);
         P := N;
         Dec(FCount);
@@ -931,7 +974,7 @@ begin
     begin
       Result := N.Value;
       P := N.Next;
-      if (Cardinal(N) < Cardinal(@FCacheItems[0])) or (Cardinal(N) > Cardinal(@FCacheItems[High(FCacheItems)])) then
+      if (NativeUInt(N) < NativeUInt(@FCacheItems[0])) or (NativeUInt(N) > NativeUInt(@FCacheItems[High(FCacheItems)])) then
         Dispose(N);
       FItems[Index] := P;
       Dec(FCount);
@@ -947,7 +990,7 @@ begin
         begin
           Result := N.Value;
           P.Next := N.Next;
-          if (Cardinal(N) < Cardinal(@FCacheItems[0])) or (Cardinal(N) > Cardinal(@FCacheItems[High(FCacheItems)])) then
+          if (NativeUInt(N) < NativeUInt(@FCacheItems[0])) or (NativeUInt(N) > NativeUInt(@FCacheItems[High(FCacheItems)])) then
             Dispose(N);
           Dec(FCount);
           Exit;
@@ -1182,6 +1225,7 @@ end;
 
 {$STACKFRAMES ON}
 
+{$IFDEF CPUX86}
 type
   PStackFrame = ^TStackFrame;
   TStackFrame = record
@@ -1224,6 +1268,29 @@ begin
     Result := nil;
   end;
 end;
+{$ENDIF CPUX86}
+
+{$IFDEF CPUX64}
+function RtlCaptureStackBackTrace(FramesToSkip, FramesToCapture: ULONG;
+  BackTrace: Pointer; BackTraceHash: PULONG): USHORT; stdcall;
+  external 'kernel32.dll' name 'RtlCaptureStackBackTrace';
+
+function Caller(Level: Integer): Pointer;
+var
+  BackTrace: array[0..15] of Pointer;
+  Count: USHORT;
+begin
+  Result := nil;
+  try
+    // Skip 1 for Caller itself, then Level frames
+    Count := RtlCaptureStackBackTrace(1 + Level, 1, @BackTrace[0], nil);
+    if Count > 0 then
+      Result := Pointer(NativeUInt(BackTrace[0]) - 1);
+  except
+    Result := nil;
+  end;
+end;
+{$ENDIF CPUX64}
 
 function SupportsEx(const Instance: TObject; const IID: TGUID; out Intf): Boolean;
 begin
@@ -1427,7 +1494,7 @@ end;
 
 function TCustomBucketList.BucketFor(AItem: Pointer): THashValue;
 begin
-  Result := THashValue(Cardinal(AItem) mod MaxBucketItems);
+  Result := THashValue(NativeUInt(AItem) mod MaxBucketItems);
 end;
 
 { TBucketList }
@@ -1441,7 +1508,7 @@ end;
 
 function TModuleBucketList.BucketFor(AItem: Pointer): THashValue;
 begin
-  Result := THashValue((Cardinal(AItem) shr 16) mod MaxBucketItems);
+  Result := THashValue((NativeUInt(AItem) shr 16) mod MaxBucketItems);
 end;
 
 {$IFDEF COMPILER10}
@@ -1826,19 +1893,39 @@ end;
 
 { TIDEEvent }
 
+{$IFDEF CPUX86}
 procedure TIDEEvent.Add(AHandler: TNotifyEvent);
   external designide_bpl name '@Events@TEvent@Add$qqrynpqqrp14System@TObject$v';
 procedure TIDEEvent.ForceAdd(AHandler: TNotifyEvent);
   external designide_bpl name '@Events@TEvent@ForceAdd$qqrynpqqrp14System@TObject$v';
 procedure TIDEEvent.Remove(AHandler: TNotifyEvent);
   external designide_bpl name '@Events@TEvent@Remove$qqrynpqqrp14System@TObject$v';
+{$ENDIF}
+{$IFDEF CPUX64}
+procedure TIDEEvent.Add(AHandler: TNotifyEvent);
+  external designide_bpl name '_ZN6Events6TEvent3AddEU9__closurePFvPN6System7TObjectEE';
+procedure TIDEEvent.ForceAdd(AHandler: TNotifyEvent);
+  external designide_bpl name '_ZN6Events6TEvent8ForceAddEU9__closurePFvPN6System7TObjectEE';
+procedure TIDEEvent.Remove(AHandler: TNotifyEvent);
+  external designide_bpl name '_ZN6Events6TEvent6RemoveEU9__closurePFvPN6System7TObjectEE';
+{$ENDIF}
 
+{$IFDEF CPUX86}
 function MainFormShown: TIDEEvent;
   external coreide_bpl name '@Ideintf@MainFormShown$qqrv';
 function MainFormCreated: TIDEEvent;
   external coreide_bpl name '@Ideintf@MainFormCreated$qqrv';
 function MainFormDestroyed: TIDEEvent;
   external coreide_bpl name '@Ideintf@MainFormDestroyed$qqrv';
+{$ENDIF}
+{$IFDEF CPUX64}
+function MainFormShown: TIDEEvent;
+  external coreide_bpl name '_ZN7Ideintf13MainFormShownEv';
+function MainFormCreated: TIDEEvent;
+  external coreide_bpl name '_ZN7Ideintf15MainFormCreatedEv';
+function MainFormDestroyed: TIDEEvent;
+  external coreide_bpl name '_ZN7Ideintf17MainFormDestroyedEv';
+{$ENDIF}
 
 procedure Init;
 var

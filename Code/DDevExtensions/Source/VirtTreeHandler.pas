@@ -38,7 +38,7 @@ type
   private
     FSignature: AnsiString;
   public
-    constructor Create(const ASignature: AnsiString);
+    constructor Create(const AX86Signature, AX64Signature: AnsiString);
     property Signature: AnsiString read FSignature;
   end;
 
@@ -46,13 +46,17 @@ type
   private
     FTree: TCustomControl;
 
-    [TreeImport('@Idevirtualtrees@TCustomVirtualStringTree@GetText$qqrp28Idevirtualtrees@TVirtualNodei')]
+    [TreeImport('@Idevirtualtrees@TCustomVirtualStringTree@GetText$qqrp28Idevirtualtrees@TVirtualNodei',
+               '_ZN15Idevirtualtrees24TCustomVirtualStringTree7GetTextEPNS_12TVirtualNodeEi')]
     FTextGetter: function(Node: PVirtualNode; Column: Integer): WideString of object;
-    [TreeImport('@Idevirtualtrees@TBaseVirtualTree@GetSelected$qqrp28Idevirtualtrees@TVirtualNode')]
+    [TreeImport('@Idevirtualtrees@TBaseVirtualTree@GetSelected$qqrp28Idevirtualtrees@TVirtualNode',
+               '_ZN15Idevirtualtrees16TBaseVirtualTree11GetSelectedEPNS_12TVirtualNodeE')]
     FSelectedGetter: function(Node: PVirtualNode): Boolean of object;
-    [TreeImport('@Idevirtualtrees@TBaseVirtualTree@SetSelected$qqrp28Idevirtualtrees@TVirtualNodeo')]
+    [TreeImport('@Idevirtualtrees@TBaseVirtualTree@SetSelected$qqrp28Idevirtualtrees@TVirtualNodeo',
+               '_ZN15Idevirtualtrees16TBaseVirtualTree11SetSelectedEPNS_12TVirtualNodeEb')]
     FSelectedSetter: procedure(Node: PVirtualNode; Value: Boolean) of object;
-    [TreeImport('@Idevirtualtrees@TBaseVirtualTree@GetNodeParent$qqrp28Idevirtualtrees@TVirtualNode')]
+    [TreeImport('@Idevirtualtrees@TBaseVirtualTree@GetNodeParent$qqrp28Idevirtualtrees@TVirtualNode',
+               '_ZN15Idevirtualtrees16TBaseVirtualTree13GetNodeParentEPNS_12TVirtualNodeE')]
     FNodeParentGetter: function(Node: PVirtualNode): PVirtualNode of object;
 
     [TreePropertySetter('FocusedNode')]
@@ -160,10 +164,15 @@ end;
 
 { TreeImport }
 
-constructor TreeImport.Create(const ASignature: AnsiString);
+constructor TreeImport.Create(const AX86Signature, AX64Signature: AnsiString);
 begin
   inherited Create;
-  FSignature :=  ASignature;
+  {$IFDEF CPUX86}
+  FSignature := AX86Signature;
+  {$ENDIF}
+  {$IFDEF CPUX64}
+  FSignature := AX64Signature;
+  {$ENDIF}
 end;
 
 { TIDEVirtualTreeHandler }

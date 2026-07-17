@@ -181,9 +181,15 @@ begin
   {$ELSE}
   @TDebugProjectOption_GetRunParams := GetTDebugProjectOption_GetRunParams;
   {$IFEND}
+  {$IFNDEF CPUX64}
+  // TODO(x64): RedirectOrgCall-based hooking of these debugger functions crashes the
+  // 64-bit IDE on debug start (EAccessViolation in @UStrClr under TDebugger.Run).
+  // Disabled on x64 until the x64 detour engine is fixed; Start Parameter injection
+  // is unavailable on the 64-bit IDE for now.
   @OrgTDebugger_Run := RedirectOrgCall(@TDebugger_Run, @HookedTDebugger_Run);
 
   @OrgTDebugProjectOption_GetRunParams := RedirectOrgCall(@TDebugProjectOption_GetRunParams, @HookedTDebugProjectOption_GetRunParams);
+  {$ENDIF ~CPUX64}
   {$IF CompilerVersion <= 21.0} // Delphi 2009/2010
   if GetModuleHandle(bcbide_bpl) <> 0 then
   begin
@@ -196,8 +202,10 @@ end;
 
 destructor TStartParameterManager.Destroy;
 begin
+  {$IFNDEF CPUX64}
   RestoreOrgCall(@TDebugger_Run, @OrgTDebugger_Run);
   RestoreOrgCall(@TDebugProjectOption_GetRunParams, @OrgTDebugProjectOption_GetRunParams);
+  {$ENDIF ~CPUX64}
   {$IF CompilerVersion <= 21.0} // Delphi 2009/2010
   if Assigned(CppTProjectOptions_GetRunParams) then
     RedirectOrgCall(@CppTProjectOptions_GetRunParams, @OrgCppTProjectOptions_GetRunParams);

@@ -1363,6 +1363,88 @@ var
   OrgCallBlockOffset: Integer;
   //OrgCallBlockCritSect: TRTLCriticalSection;
 
+{$IFDEF CPUX64}
+// A trampoline that copies a rel32 call/jmp or a RIP-relative instruction from the
+// original prologue must be reachable from the original with a signed 32-bit offset.
+// On x64 the module hosting Proc and a naively allocated block can be >2GB apart,
+// which overflows the fixup. These helpers place the block within +/-2GB of Proc.
+function IsInRel32Range(A, B: Pointer): Boolean;
+var
+  Delta: Int64;
+begin
+  Delta := Int64(NativeUInt(A)) - Int64(NativeUInt(B));
+  if Delta < 0 then
+    Delta := -Delta;
+  Result := Delta < $7FF00000; // < ~2GB, with ~1MB safety margin
+end;
+
+function AllocExecBlockNear(Target: Pointer; Size: NativeUInt): Pointer;
+var
+  SysInfo: TSystemInfo;
+  Gran, Lo, Hi, Cand, RegionEnd: NativeUInt;
+  mbi: TMemoryBasicInformation;
+begin
+  Result := nil;
+  GetSystemInfo(SysInfo);
+  Gran := SysInfo.dwAllocationGranularity;
+  if Gran = 0 then
+    Gran := $10000;
+
+  if NativeUInt(Target) > $70000000 then
+    Lo := NativeUInt(Target) - $70000000
+  else
+    Lo := NativeUInt(SysInfo.lpMinimumApplicationAddress);
+  Hi := NativeUInt(Target) + $70000000;
+  if Hi > NativeUInt(SysInfo.lpMaximumApplicationAddress) then
+    Hi := NativeUInt(SysInfo.lpMaximumApplicationAddress);
+
+  // Search upward from Target for a free region that can hold the block.
+  Cand := NativeUInt(Target);
+  while Cand < Hi do
+  begin
+    if VirtualQuery(Pointer(Cand), mbi, SizeOf(mbi)) = 0 then
+      Break;
+    RegionEnd := NativeUInt(mbi.BaseAddress) + NativeUInt(mbi.RegionSize);
+    if mbi.State = MEM_FREE then
+    begin
+      Cand := (NativeUInt(mbi.BaseAddress) + Gran - 1) and not (Gran - 1);
+      if (Cand >= NativeUInt(mbi.BaseAddress)) and (Cand + Size <= RegionEnd) and (Cand < Hi) then
+      begin
+        Result := VirtualAlloc(Pointer(Cand), Size, MEM_COMMIT or MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+        if Result <> nil then
+          Exit;
+      end;
+    end;
+    Cand := RegionEnd;
+  end;
+
+  // Search downward from Target.
+  Cand := NativeUInt(Target);
+  while Cand > Lo do
+  begin
+    if VirtualQuery(Pointer(Cand), mbi, SizeOf(mbi)) = 0 then
+      Break;
+    if mbi.State = MEM_FREE then
+    begin
+      Cand := (NativeUInt(mbi.BaseAddress) + Gran - 1) and not (Gran - 1);
+      if (Cand + Size <= NativeUInt(mbi.BaseAddress) + NativeUInt(mbi.RegionSize)) and (Cand >= Lo) then
+      begin
+        Result := VirtualAlloc(Pointer(Cand), Size, MEM_COMMIT or MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+        if Result <> nil then
+          Exit;
+      end;
+    end;
+    if NativeUInt(mbi.AllocationBase) <> 0 then
+      Cand := NativeUInt(mbi.AllocationBase)
+    else
+      Cand := NativeUInt(mbi.BaseAddress);
+    if Cand <= Gran then
+      Break;
+    Dec(Cand, Gran);
+  end;
+end;
+{$ENDIF CPUX64}
+
 function CreateOrgCallMethodPtr(Proc: Pointer): Pointer;
 const
   BlockSize = 4096;
@@ -1397,8 +1479,21 @@ begin
   FullCodeSize := ((CodeSize + 1) + 3) and not $3;
 
   //EnterCriticalSection(OrgCallBlockCritSect);
-  if (OrgCallBlock = nil) or (OrgCallBlockOffset + FullCodeSize > BlockSize) then
+  if (OrgCallBlock = nil) or (OrgCallBlockOffset + FullCodeSize > BlockSize)
+     {$IFDEF CPUX64}
+     // Also get a fresh block when the current one is out of rel32 range of Proc,
+     // otherwise prologue offset fixups would overflow (checked at both block ends).
+     or not IsInRel32Range(OrgCallBlock, Proc)
+     or not IsInRel32Range(PByte(OrgCallBlock) + BlockSize, Proc)
+     {$ENDIF} then
   begin
+    {$IFDEF CPUX64}
+    // Place the trampoline block within +/-2GB of Proc so copied rel32/RIP-relative
+    // operands remain representable; fall back to anywhere only if that fails.
+    OrgCallBlock := AllocExecBlockNear(Proc, BlockSize);
+    if OrgCallBlock = nil then
+      OrgCallBlock := VirtualAlloc(nil, BlockSize, MEM_COMMIT or MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    {$ELSE}
     // Append the next block, if possible.
     P := PAnsiChar( OrgCallBlock );
     if P <> nil then
@@ -1409,6 +1504,7 @@ begin
     OrgCallBlock := VirtualAlloc(P, BlockSize, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
     if OrgCallBlock = nil then
       OrgCallBlock := VirtualAlloc(nil, BlockSize, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+    {$ENDIF}
     if OrgCallBlock = nil then
       System.Error(reOutOfMemory);
     OrgCallBlockOffset := 0;

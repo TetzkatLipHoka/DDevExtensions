@@ -78,7 +78,7 @@ implementation
 
 uses
   Main, LabelMarginHelper,
-  {$IFDEF COMPILER12_UP}FixAlphaControlsPNG,{$ENDIF}
+  {$IF Defined(COMPILER12_UP) and Defined(INCLUDE_ACPNGFIX)}FixAlphaControlsPNG,{$IFEND}
   {$IFDEF DELPHI28_UP}RemovePixelsPerInchProperty,{$ENDIF}
   RemoveExplicitProperty,
   RemoveTextHeightProperty;
@@ -237,9 +237,9 @@ begin
   SetRemoveExplicitPropertyActive(Active and RemoveExplicitProperty);
   {$ENDIF COMPILER10_UP}
 
-  {$IFDEF COMPILER12_UP}
+  {$IF Defined(COMPILER12_UP) and Defined(INCLUDE_ACPNGFIX)}
   SetFixAlphaControlsPNGActive(Active and FixAlphaControlsPNG);
-  {$ENDIF COMPILER12_UP}
+  {$IFEND}
   
   {$IFDEF COMPILER28_UP}
   SetRemovePixelsPerInchPropertyActive(Active and RemovePixelsPerInchProperty);

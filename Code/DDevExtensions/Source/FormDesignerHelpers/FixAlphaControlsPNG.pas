@@ -5,7 +5,7 @@ unit FixAlphaControlsPNG;
 
 interface
 
-{$IFDEF COMPILER12_UP}
+{$IF Defined(COMPILER12_UP) and Defined(INCLUDE_ACPNGFIX)}
 
 uses
   Classes, Graphics, pngimage;
@@ -24,14 +24,16 @@ type
 
 procedure SetFixAlphaControlsPNGActive(Active: Boolean);
 
-{$ENDIF COMPILER12_UP}
+{$IFEND}
 
 implementation
 
+{$IF Defined(COMPILER12_UP) and Defined(INCLUDE_ACPNGFIX)}
 uses
   pnglang;
+{$IFEND}
 
-{$IFDEF COMPILER12_UP}
+{$IF Defined(COMPILER12_UP) and Defined(INCLUDE_ACPNGFIX)}
 
 {$IFDEF PNGGraphicBMP}
 procedure TPNGGraphic.LoadFromStream(Stream: TStream);
@@ -165,6 +167,6 @@ begin
   end;
 end;
 
-{$ENDIF COMPILER12_UP}
+{$IFEND}
 
 end.

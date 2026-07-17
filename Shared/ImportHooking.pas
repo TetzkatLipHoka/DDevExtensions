@@ -407,7 +407,7 @@ begin
     Result := (PUSH = $68) and (JMP = $E9);
 end;}
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 function IsWin9xDebugThunk(AnAddr: Pointer): Boolean;
 { -> EAX: AnAddr }
 asm

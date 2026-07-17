@@ -62,14 +62,14 @@ type
 
 procedure TFormEx.DefineProperties(Filer: TFiler);
 begin
-{$IF True}
+{$IF CompilerVersion >= 33.0} // Delphi 10.3+ (inline variables)
   var DefinePropertiesProc: TDefinePropertiesProc;
   TMethod(DefinePropertiesProc).Code := @TScrollingWinControl.DefineProperties;
   TMethod(DefinePropertiesProc).Data := Self;
   DefinePropertiesProc(Filer);
 {$ELSE}
   inherited DefineProperties(Filer);
-{$ENDIF}
+{$IFEND}
 
   Filer.DefineProperty('TextHeight', IgnoreInteger, nil, False);
   Filer.DefineProperty('IgnoreFontProperty', ReadIgnoreFontProperty, nil, False);

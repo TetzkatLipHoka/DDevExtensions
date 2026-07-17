@@ -237,7 +237,7 @@ uses
 var
   DocModuleIsDormantOffset: Integer;
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 procedure Docmodul_ModuleListAddr;
   external coreide_bpl name '@Docmodul@ModuleList';
 {$ENDIF}
@@ -310,7 +310,7 @@ type
 
 {$J+}
 const
-  {$IFDEF CPUX86}
+  {$IFNDEF CPUX64}
   DocModuleVirtMethods: array[TDocModuleVirtMethodType] of TDocModuleVirtMethodRec = (
     (Import: '@Docmodul@TDocModule@CheckFileDate$qqrv'),
     (Import: '@Docmodul@TDocModule@CanReloadFile$qqrv'),
@@ -330,7 +330,7 @@ const
     (Import: '@Docmodul@TDocModule@Activate$qqro'),
     (Import: '@Docmodul@TDocModule@Modified$qqrv')
   );
-  {$ENDIF CPUX86}
+  {$ENDIF ~CPUX64}
   {$IFDEF CPUX64}
   DocModuleVirtMethods: array[TDocModuleVirtMethodType] of TDocModuleVirtMethodRec = (
     (Import: '_ZN8Docmodul10TDocModule13CheckFileDateEv'),
@@ -356,7 +356,7 @@ const
 
 { TPascalCodeMgrModHandler }
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 procedure ClassTPascalCodeMgrModHandler;
   external delphicoreide_bpl name '@Delphimodule@TPascalCodeMgrModHandler@';
 {$ENDIF}
@@ -365,7 +365,7 @@ procedure ClassTPascalCodeMgrModHandler;
   external delphicoreide_bpl name '_ZTVN12Delphimodule24TPascalCodeMgrModHandlerE';
 {$ENDIF}
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 procedure TPascalCodeMgrModHandler.ResurrectForm;
   external delphicoreide_bpl name '@Delphimodule@TPascalCodeMgrModHandler@ResurrectForm$qqrv';
 {$ENDIF}
@@ -374,7 +374,7 @@ procedure TPascalCodeMgrModHandler.ResurrectForm;
   external delphicoreide_bpl name '_ZN12Delphimodule24TPascalCodeMgrModHandler13ResurrectFormEv';
 {$ENDIF}
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 procedure TPascalCodeMgrModHandler.ReloadFile;
   external delphicoreide_bpl name '@Delphimodule@TPascalCodeMgrModHandler@ReloadFile$qqrv';
 {$ENDIF}
@@ -385,7 +385,7 @@ procedure TPascalCodeMgrModHandler.ReloadFile;
 
 { TDocModule }
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 procedure ClassTDocModule;
   external coreide_bpl name '@Docmodul@TDocModule@';
 {$ENDIF}
@@ -394,7 +394,7 @@ procedure ClassTDocModule;
   external coreide_bpl name '_ZTVN8Docmodul10TDocModuleE';
 {$ENDIF}
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 procedure TDocModule_GoDormant;
   external coreide_bpl name '@Docmodul@TDocModule@GoDormant$qqrv';
 {$ENDIF}
@@ -403,7 +403,7 @@ procedure TDocModule_GoDormant;
   external coreide_bpl name '_ZN8Docmodul10TDocModule9GoDormantEv';
 {$ENDIF}
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 function TDocModule.GetCanFree: Boolean;
   external coreide_bpl name '@Docmodul@TDocModule@GetCanFree$qqrv';
 {$ENDIF}
@@ -412,7 +412,7 @@ function TDocModule.GetCanFree: Boolean;
   external coreide_bpl name '_ZN8Docmodul10TDocModule10GetCanFreeEv';
 {$ENDIF}
 
-{$IF (CompilerVersion >= 22.0) and Defined(CPUX86)} // XE+
+{$IF (CompilerVersion >= 22.0) and not Defined(CPUX64)} // XE+
 function TDocModule.CanFreeOrGoDormant(const DormantOk: Boolean): Boolean;
   external coreide_bpl name '@Docmodul@TDocModule@CanFreeOrGoDormant$qqrxo';
 {$IFEND}
@@ -421,7 +421,7 @@ function TDocModule.CanFreeOrGoDormant(const DormantOk: Boolean): Boolean;
   external coreide_bpl name '_ZN8Docmodul10TDocModule18CanFreeOrGoDormantEb';
 {$ENDIF}
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 function TDocModule.GetCodeIDocModule: TInterfacedObject;
   external coreide_bpl name '@Docmodul@TDocModule@GetCodeIDocModule$qqrv';
 {$ENDIF}
@@ -522,7 +522,7 @@ end;
 
 { TDocModuleVirtMethodRec }
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 function TDocModuleVirtMethodRec.CallBoolean(Instance: TDocModule): Boolean;
 asm
   jmp TDocModuleVirtMethodRec.Call
@@ -572,7 +572,7 @@ asm
 
   pop ebx
 end;
-{$ENDIF CPUX86}
+{$ENDIF ~CPUX64}
 
 {$IFDEF CPUX64}
 function TDocModuleVirtMethodRec.CallBoolean(Instance: TDocModule): Boolean;
@@ -623,7 +623,7 @@ end;
 
 
 function InitDocModuleHandler: Boolean;
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 const
   GoDormantBytes: array[0..12] of SmallInt = (
     $B3, $01,            // mov bl,$01                  //  0
@@ -632,7 +632,7 @@ const
     $8D, $55, $FC,       // lea edx,[ebp-$04]           //  8
     $8B, $C6             // mov eax,esi                 // 11
   );
-{$ENDIF CPUX86}
+{$ENDIF ~CPUX64}
 var
   DocModuleClass: TClass;
   CoreIdeLib: THandle;
@@ -704,7 +704,7 @@ begin
     end;
   end;
 
-  {$IFDEF CPUX86}
+  {$IFNDEF CPUX64}
   P := FindMethodPtr(THandle(GetActualAddr(@TDocModule_GoDormant)), GoDormantBytes, $40);
   if P = nil then
   begin

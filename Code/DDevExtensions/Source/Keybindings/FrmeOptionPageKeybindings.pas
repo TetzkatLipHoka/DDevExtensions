@@ -121,7 +121,7 @@ procedure EnvironmentOptionsAddr;
   external coreide_bpl name '@Envoptions@EnvironmentOptions';
 {$IFEND}
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 procedure EditorActionListsPtr;
   external coreide_bpl name '@Editoractions@EditorActionLists';
 {$ENDIF}

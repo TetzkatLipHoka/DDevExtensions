@@ -252,7 +252,7 @@ end;
 type
   TOpenControl = class(TControl);
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 procedure OrgLoadRuntimeDesktop(Instance: TObject);
   external coreide_bpl name '@Desktop@TDesktopStates@LoadRuntimeDesktop$qqrv';
 {$ENDIF}
@@ -359,7 +359,7 @@ begin
     if LibHandle <> 0 then
     begin
       DblClick := DbgStrictGetProcAddress(LibHandle,
-        {$IFDEF CPUX86}'@Editorform@TEditWindow@TabControlDblClick$qqrp14System@TObject'{$ENDIF}
+        {$IFNDEF CPUX64}'@Editorform@TEditWindow@TabControlDblClick$qqrp14System@TObject'{$ENDIF}
         {$IFDEF CPUX64}'_ZN10Editorform11TEditWindow18TabControlDblClickEPN6System7TObjectE'{$ENDIF});
       if DblClick <> nil then
       begin
@@ -506,7 +506,7 @@ begin
   begin
     FIncBuildNumOnBuildOnly := Value;
 
-    {$IFDEF CPUX86}
+    {$IFNDEF CPUX64}
     // IncBuildNumOnBuildOnly uses x86 byte-pattern patching - not supported on x64
     Patch(delphicoreide_bpl, '@Pasmgr@TPascalPackageCodeUpdater@AfterCompile$qqr21Compintf@TCompileModeroo',
       FIncBuildNumOnBuildOnly, PascalPackageCodeUpdaterBytes, PascalPackageCodeUpdaterBytesIdx);
@@ -520,7 +520,7 @@ begin
       Patch(bcbide_bpl, '@Cppmgr@TCppPackageProjectUpdater@AfterCompile$qqr21Compintf@TCompileModeroo',
         FIncBuildNumOnBuildOnly, CppPackageProjectUpdaterBytes, CppPackageProjectUpdaterBytesIdx);
     end;
-    {$ENDIF CPUX86}
+    {$ENDIF ~CPUX64}
   end;
 end;
 {$IFEND}
@@ -622,7 +622,7 @@ end;
 var
   TProcess_stopOnFirstAddrHook: TRedirectCode;
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 const
   {$IF CompilerVersion >= 28.0} // XE7+
   _IDbkThread_ = '41System@%DelphiInterface$14Dbk@IDbkThread%'; // XE7+
@@ -632,7 +632,7 @@ const
 
 function TProcess_stopOnFirstAddr(Process: TObject; Addr: Pointer; const Intf: IInterface; var ShouldStop: LongWord): HRESULT; stdcall;
   external dbkdebugide_bpl name '@Debug@TProcess@stopOnFirstAddr$qqs' + _xp_ + '17Dbk@DbkProcAddr_tx' + _IDbkThread_ + 'rui';
-{$ENDIF CPUX86}
+{$ENDIF ~CPUX64}
 {$IFDEF CPUX64}
 function TProcess_stopOnFirstAddr(Process: TObject; Addr: Pointer; const Intf: IInterface; var ShouldStop: LongWord): HRESULT;
   external dbkdebugide_bpl name '_ZN5Debug8TProcess15stopOnFirstAddrEPN3Dbk13DbkProcAddr_tEN6System15DelphiInterfaceINS1_10IDbkThreadEEERj';
@@ -735,7 +735,7 @@ end;
 
 procedure TDSUFeaturesConfig.SetReplacePackageAddContain(const Value: Boolean);
 const
-  {$IFDEF CPUX86}
+  {$IFNDEF CPUX64}
   sAddProjectModule = '@Pasmgr@TPascalProjectUpdater@AddProjectModule$qqrv';
   sPackage_AddProjectModule = '@Pasmgr@TPascalPackageCodeUpdater@AddProjectModule$qqrv';
   sProcessAddCommand = '@Pkgcontainers@TStdPackageProjectContainer@ProcessAddCommand$qqrx27Containerintf@TLocalCommand';
@@ -808,7 +808,7 @@ type
 var
   OrgCallOpenModuleFile: procedure(const ModuleName, EditorFileName: string);
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 procedure OpenModuleFile(const ModuleName, EditorFileName: string);
   external delphicoreide_bpl name '@Commonpasreg@OpenModuleFile$qqrx20System@UnicodeStringt1';
 {$ENDIF}
@@ -817,7 +817,7 @@ procedure OpenModuleFile(const ModuleName, EditorFileName: string);
   external delphicoreide_bpl name '_ZN12Commonpasreg14OpenModuleFileEN6System13UnicodeStringES1_';
 {$ENDIF}
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 {$IF CompilerVersion >= 22.0} // Delphi XE+
 function ExpandRootMacro(const InString: string; const AdditionalVars: TObject = nil): string;
   external coreide_bpl name '@Uiutils@ExpandRootMacro$qqrx20System@UnicodeString' + _xp_ + '22Codemgr@TNameValueHash';
@@ -825,13 +825,13 @@ function ExpandRootMacro(const InString: string; const AdditionalVars: TObject =
 function ExpandRootMacro(const Name: string): string;
   external coreide_bpl name '@Uiutils@ExpandRootMacro$qqrx20System@UnicodeString';
 {$IFEND}
-{$ENDIF CPUX86}
+{$ENDIF ~CPUX64}
 {$IFDEF CPUX64}
 function ExpandRootMacro(const InString: string; const AdditionalVars: TObject = nil): string;
   external coreide_bpl name '_ZN7Uiutils15ExpandRootMacroEN6System13UnicodeStringEPN7Codemgr14TNameValueHashE';
 {$ENDIF CPUX64}
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 procedure VarBorlandIDE;
   external coreide_bpl name '@Ideintf@BorlandIDE';
 {$ENDIF}
@@ -1218,7 +1218,7 @@ var
   TDelphiProjectModuleHandler_GetFormListHook: TRedirectCode;
   TDelphiProjectModuleHandler_GetFormList: procedure(Instance: TObject; List: TStrings);
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 procedure TPascalProjectUpdaterClass;
   external delphicoreide_bpl name '@Pasmgr@TPascalProjectUpdater@';
 {$ENDIF}
@@ -1226,7 +1226,7 @@ procedure TPascalProjectUpdaterClass;
 procedure TPascalProjectUpdaterClass;
   external delphicoreide_bpl name '_ZTVN6Pasmgr21TPascalProjectUpdaterE';
 {$ENDIF}
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 procedure TPascalProjectUpdater_GetFormList(Instance: TObject; List: TStrings);
   external delphicoreide_bpl name
     '@Pasmgr@TPascalProjectUpdater@GetFormList$qqrp' + System_Classes_TStrings;
@@ -1276,7 +1276,7 @@ end;
 
 procedure TDSUFeaturesConfig.SetShowAllFrames(const Value: Boolean);
 const
-  {$IFDEF CPUX86}
+  {$IFNDEF CPUX64}
   sGetFormList = '@Basedelphiproject@TDelphiProjectModuleHandler@GetFormList$qqrp' + System_Classes_TStrings;
   {$ENDIF}
   {$IFDEF CPUX64}
@@ -1301,7 +1301,7 @@ end;
 
 {----------------------------------------------------------------------------------}
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 procedure TCustomEditControl_HelpKeyword(Editor: TControl);
   external coreide_bpl name '@Editorcontrol@TCustomEditControl@HelpKeyword$qqrv';
 {$ENDIF}
@@ -1483,7 +1483,7 @@ begin
     if FParseThread = nil then
     begin
       FParseThread := DbgStrictGetProcAddress(GetModuleHandle(coreide_bpl),
-        {$IFDEF CPUX86}'@Parserthread@ParseThread'{$ENDIF}
+        {$IFNDEF CPUX64}'@Parserthread@ParseThread'{$ENDIF}
         {$IFDEF CPUX64}'_ZN12Parserthread11ParseThreadE'{$ENDIF});
       if FParseThread <> nil then
         FParseThread := TThread(Pointer(FParseThread)^);

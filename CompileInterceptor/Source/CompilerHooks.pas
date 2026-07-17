@@ -810,7 +810,7 @@ const
 
   // >= 15
 //  sGetCppCallbacks = '@Pascppcominout@GetCppCallbacks$qqrv';
-  {$IFDEF CPUX86}
+  {$IFNDEF CPUX64}
   sGetDccCallbacks = '@Pascppcominout@GetDccCallbacks$qqrv';
   {$ENDIF}
   {$IFDEF CPUX64}

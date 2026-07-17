@@ -100,7 +100,7 @@ type
   end;
 {$IFEND}
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 {$IF CompilerVersion >= 22.0} // XE+
 procedure TCompiler_Compile(Compiler: TObject; var BuildInfo: TProjectBuildInfo; const BuildControl: TBuildControl; const FileName: string);
   external delphicoreide_bpl name '@Basepascomintf@TCompiler@Compile$qqrr26Compintf@TProjectBuildInforx22Compintf@TBuildControlx20System@UnicodeString';
@@ -117,7 +117,7 @@ function TCompiler_Compile(Compiler: TObject; const FileName: string; const Proj
 var
   Org_TCompiler_Compile: function(Compiler: TObject; const FileName: string; const Project: ICustomProject; CompileMode: TCompileMode; Wait, ClearPackages, ClearMessages: Boolean; FinishProc: TCompileFinishedProc): TCompileResult;
 {$IFEND}
-{$ENDIF CPUX86}
+{$ENDIF ~CPUX64}
 {$IFDEF CPUX64}
 procedure TCompiler_Compile(Compiler: TObject; var BuildInfo: TProjectBuildInfo; const BuildControl: TBuildControl; const FileName: string);
   external delphicoreide_bpl name '_ZN14Basepascomintf9TCompiler7CompileERN8Compintf17TProjectBuildInfoERKNS1_13TBuildControlEN6System13UnicodeStringE';
@@ -125,7 +125,7 @@ var
   Org_TCompiler_Compile: procedure(Compiler: TObject; var BuildInfo: TProjectBuildInfo; const BuildControl: TBuildControl; const FileName: string);
 {$ENDIF CPUX64}
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 {$IF CompilerVersion >= 23.0} // XE2+
 function TCustomCodeIProject_GetCompState(Project: TObject; const PlatformName: string): Integer;
   external coreide_bpl name '@Projectmodule@TCustomCodeIProject@GetCompState$qqrx20System@UnicodeString';
@@ -133,7 +133,7 @@ function TCustomCodeIProject_GetCompState(Project: TObject; const PlatformName: 
 function TCustomCodeIProject_GetCompState(Project: TObject): Integer;
   external coreide_bpl name '@Projectmodule@TCustomCodeIProject@GetCompState$qqrv';
 {$IFEND}
-{$ENDIF CPUX86}
+{$ENDIF ~CPUX64}
 {$IFDEF CPUX64}
 function TCustomCodeIProject_GetCompState(Project: TObject; const PlatformName: string): Integer;
   external coreide_bpl name '_ZN13Projectmodule19TCustomCodeIProject12GetCompStateEN6System13UnicodeStringE';

@@ -237,6 +237,14 @@ implementation
 uses
   Registry, IDEHooks;
 
+{$IF CompilerVersion < 18.5}
+// Pre-Delphi 2007 (e.g. Delphi 7) has no NativeInt/NativeUInt. On the 32-bit
+// x86 compilers these types are pointer-sized, i.e. Integer/Cardinal.
+type
+  NativeInt = Integer;
+  NativeUInt = Cardinal;
+{$IFEND}
+
 function ReadGlobalRegOption(const ValueName: string; DefaultValue: Boolean): Boolean;
 var
   KeyName: string;
@@ -458,7 +466,7 @@ begin
 end;
 
 function DelphiInterfaceToObject(const Intf: IInterface): TObject;
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 // x86: decode the compiler-generated interface adjustor thunk (add [esp+4]/eax, -offset;
 // jmp) to recover the object pointer behind the interface. The thunk machine code is
 // x86-specific; the x64 build uses the RTL cast instead (see {$ELSE} below).
@@ -532,9 +540,9 @@ begin
       Result := nil;
     end;
 end;
-{$ENDIF CPUX86}
+{$ENDIF ~CPUX64}
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 function IsObject(Address: Pointer): Boolean;
 asm
         MOV     EAX, [Address]
@@ -584,7 +592,7 @@ begin
       while Result > SizeOf(Pointer) do // omit VMT
       begin
         try
-          Field := TObject(PPointer(PByte(Obj) + Result)^);
+          Field := TObject(PPointer(PAnsiChar(Obj) +Result)^);
           if (NativeUInt(Field) >= $00010000) and
              not IsBadReadPtr(Field, SizeOf(TClass)) and
              not IsBadReadPtr(PPointer(Field)^, {TObject.InstanceSize} SizeOf(Pointer)) and
@@ -604,7 +612,7 @@ begin
       while Result < InstSize do
       begin
         try
-          Field := TObject(PPointer(PByte(Obj) + Result)^);
+          Field := TObject(PPointer(PAnsiChar(Obj) +Result)^);
           if (NativeUInt(Field) >= $00010000) and
              not IsBadReadPtr(Field, SizeOf(TClass)) and
              not IsBadReadPtr(PPointer(Field)^, {TObject.InstanceSize} SizeOf(Pointer)) and
@@ -629,7 +637,7 @@ begin
   if Offset = 0 then
     raise Exception.CreateFmt('%s object field not found', [AClassName])
   else
-    Result := TObject(PPointer(PByte(Obj) + Offset)^);
+    Result := TObject(PPointer(PAnsiChar(Obj) +Offset)^);
 end;
 
 function MakeNotifyEvent(Data, Code: Pointer): TNotifyEvent;
@@ -687,7 +695,7 @@ begin
   end;
 end;
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 function HashString(const AItem: string): Integer;
 asm
   test eax, eax
@@ -719,7 +727,7 @@ asm
   and eax, MaxBucketItems-1
 @@Leave:
 end;
-{$ENDIF CPUX86}
+{$ENDIF ~CPUX64}
 
 {$IFDEF CPUX64}
 function HashString(const AItem: string): Integer;
@@ -1238,7 +1246,7 @@ end;
 
 {$STACKFRAMES ON}
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 type
   PStackFrame = ^TStackFrame;
   TStackFrame = record
@@ -1281,7 +1289,7 @@ begin
     Result := nil;
   end;
 end;
-{$ENDIF CPUX86}
+{$ENDIF ~CPUX64}
 
 {$IFDEF CPUX64}
 function RtlCaptureStackBackTrace(FramesToSkip, FramesToCapture: ULONG;
@@ -1906,7 +1914,7 @@ end;
 
 { TIDEEvent }
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 procedure TIDEEvent.Add(AHandler: TNotifyEvent);
   external designide_bpl name '@Events@TEvent@Add$qqrynpqqrp14System@TObject$v';
 procedure TIDEEvent.ForceAdd(AHandler: TNotifyEvent);
@@ -1923,7 +1931,7 @@ procedure TIDEEvent.Remove(AHandler: TNotifyEvent);
   external designide_bpl name '_ZN6Events6TEvent6RemoveEU9__closurePFvPN6System7TObjectEE';
 {$ENDIF}
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 function MainFormShown: TIDEEvent;
   external coreide_bpl name '@Ideintf@MainFormShown$qqrv';
 function MainFormCreated: TIDEEvent;

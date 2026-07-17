@@ -74,7 +74,7 @@ uses
 
 { TPropField }
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 function TPropField.GetValue: Variant;
   external vclide_bpl name '@Idepropset@TPropField@GetValue$qqrv';
 {$ENDIF}
@@ -83,7 +83,7 @@ function TPropField.GetValue: Variant;
   external vclide_bpl name '_ZN10Idepropset10TPropField8GetValueEv';
 {$ENDIF}
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 procedure TPropField.SetValue(const Value: Variant);
   external vclide_bpl name '@Idepropset@TPropField@SetValue$qqrrx14System@Variant';
 {$ENDIF}
@@ -584,7 +584,7 @@ type
     function GetEnvOptions(const APlatform, APersonality: string): PObject;
   end;
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 function PlatformManager: TPlatformManager;
   external coreide_bpl name '@Platforms@PlatformManager$qqrv';
 function TPlatformManager.GetEnvOptions(const APlatform: string; const APersonality: string): PObject;

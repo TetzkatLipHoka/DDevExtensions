@@ -167,7 +167,7 @@ end;
 constructor TreeImport.Create(const AX86Signature, AX64Signature: AnsiString);
 begin
   inherited Create;
-  {$IFDEF CPUX86}
+  {$IFNDEF CPUX64}
   FSignature := AX86Signature;
   {$ENDIF}
   {$IFDEF CPUX64}

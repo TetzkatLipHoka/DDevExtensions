@@ -43,7 +43,7 @@ type
   TDebugger = class(TObject);
   TDebugProjectOption = class(TObject);
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 procedure TDebugger_Run(Self: TDebugger; Mode: TOTARunMode);
   external dbkdebugide_bpl name '@Debug@TDebugger@Run$qqr20Toolsapi@TOTARunMode';
 {$ENDIF}
@@ -52,7 +52,7 @@ procedure TDebugger_Run(Self: TDebugger; Mode: TOTARunMode);
   external dbkdebugide_bpl name '_ZN5Debug9TDebugger3RunEN8Toolsapi11TOTARunModeE';
 {$ENDIF}
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 {$IF CompilerVersion <> 22.0} // not XE
 function _TDebugProjectOption_GetRunParams(Self: TDebugProjectOption): string;
   {$IF CompilerVersion >= 23.0} // Delphi XE2+
@@ -64,7 +64,7 @@ function _TDebugProjectOption_GetRunParams(Self: TDebugProjectOption): string;
 function TDebuggerProjectOptions_GetOptionClassInfo(Instance: TObject): Pointer; // ClassInfo
   external coreide_bpl name '@Debuggerprojectoptions@TDebuggerProjectOptions@GetOptionClassInfo$qqrv';
 {$IFEND}
-{$ENDIF CPUX86}
+{$ENDIF ~CPUX64}
 {$IFDEF CPUX64}
 function _TDebugProjectOption_GetRunParams(Self: TDebugProjectOption): string;
   external coreide_bpl name '_ZN22Debuggerprojectoptions19TDebugProjectOption12GetRunParamsEv';
@@ -220,7 +220,7 @@ begin
   {$IFEND}
   @OrgTDebugger_Run := RedirectOrgCall(@TDebugger_Run, @HookedTDebugger_Run);
 
-  {$IFDEF CPUX86}
+  {$IFNDEF CPUX64}
   @OrgTDebugProjectOption_GetRunParams := RedirectOrgCall(@TDebugProjectOption_GetRunParams, @HookedTDebugProjectOption_GetRunParams);
   {$ELSE}
   // Win64: hook with a method (correct Self/@Result register convention, see above).
@@ -239,7 +239,7 @@ end;
 destructor TStartParameterManager.Destroy;
 begin
   RestoreOrgCall(@TDebugger_Run, @OrgTDebugger_Run);
-  {$IFDEF CPUX86}
+  {$IFNDEF CPUX64}
   RestoreOrgCall(@TDebugProjectOption_GetRunParams, @OrgTDebugProjectOption_GetRunParams);
   {$ELSE}
   RestoreOrgCall(@TDebugProjectOption_GetRunParams, OrgGetRunParamsCode);

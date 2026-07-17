@@ -183,7 +183,7 @@ begin
   if (PImageDosHeader(BaseAddress)^.e_magic <> IMAGE_DOS_SIGNATURE) or
     (PImageDosHeader(BaseAddress)^._lfanew = 0) then
     Exit;
-  Result := PImageNtHeaders(PByte(BaseAddress) + PImageDosHeader(BaseAddress)^._lfanew);
+  Result := PImageNtHeaders(PAnsiChar(BaseAddress) + PImageDosHeader(BaseAddress)^._lfanew);
   if IsBadReadPtr(Result, SizeOf(TImageNtHeaders)) or
     (Result^.Signature <> IMAGE_NT_SIGNATURE) then
       Result := nil
@@ -236,7 +236,7 @@ begin
   if ImportDir.VirtualAddress = 0 then
     Exit;
   CurProcess := GetCurrentProcess;
-  ImportDesc := PImageImportDescriptor(PByte(Base) + ImportDir.VirtualAddress);
+  ImportDesc := PImageImportDescriptor(PAnsiChar(Base) + ImportDir.VirtualAddress);
   RefName := PAnsiChar({$IFDEF UNICODE}UTF8Encode{$ENDIF}(ModuleName));
   while ImportDesc^.Name <> 0 do
   begin
@@ -738,7 +738,7 @@ begin
   end;
 end;
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 function GetStartCodeSize(CodePtr: Pointer; RequiredSize: Integer; OffsetTable: POffsetTable): Integer;
 // TODO: "Jcc rel": convert to Jcc dword-rel and adjust offsets
 var
@@ -1128,7 +1128,7 @@ begin
     {$IFEND}
   end;
 end;
-{$ENDIF CPUX86}
+{$ENDIF ~CPUX64}
 
 {$IFDEF CPUX64}
 function GetStartCodeSize(CodePtr: Pointer; RequiredSize: Integer; OffsetTable: POffsetTable = nil): Integer;

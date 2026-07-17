@@ -142,7 +142,7 @@ uses
 var
   HookTToolForm_LoadPalette: TRedirectCode;
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 procedure TToolForm_LoadPalette(Instance: TForm);
   external coreide_bpl name '@Toolfrm@TToolForm@LoadPalette$qqrv';
 {$ENDIF}

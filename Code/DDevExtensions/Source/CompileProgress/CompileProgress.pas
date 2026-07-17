@@ -359,7 +359,7 @@ begin
 end;
 
 {$IF CompilerVersion >= 21.0} // Delphi 2010+
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 procedure HookedProjectGroupCompileActive;
 asm
   // Only show the dialog if we are called by TAppBuilder.Compile()
@@ -385,7 +385,7 @@ asm
   jb CompileActiveProject
   jmp CallOrgProjectGroupCompileActive
 end;
-{$ENDIF CPUX86}
+{$ENDIF ~CPUX64}
 {$IFDEF CPUX64}
 procedure HookedProjectGroupCompileActive;
 asm
@@ -409,7 +409,7 @@ procedure InitPlugin(Unload: Boolean);
 // We can't hook into bds.exe because the copy protection will catch us. So we need to go a different
 // way than what we used to do in Delphi 2009.
 const
-  {$IFDEF CPUX86}
+  {$IFNDEF CPUX64}
   StartCompileSymbol = '@Comprgrs@TProgressForm@StartCompile$qqrv';
   ProjectGroupCompileActiveSymbol = '@Projectgroup@TProjectGroup@CompileActive$qqr21Compintf@TCompileModeo';
   {$ENDIF}

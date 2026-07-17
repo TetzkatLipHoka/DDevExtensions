@@ -101,7 +101,7 @@ const
   sCurrFileLabelName = 'CurrFile';
   {$IFEND}
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 procedure ProgressFormPtr;
   external coreide_bpl name '@Comprgrs@ProgressForm';
 {$ENDIF}

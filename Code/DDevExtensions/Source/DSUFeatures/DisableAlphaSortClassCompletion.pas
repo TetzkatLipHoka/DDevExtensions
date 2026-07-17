@@ -95,7 +95,7 @@ var
   CallAddrTSortedThingList_SetSortedP: PByte;
   CompleteMethodSymbolTableIteratorP: PByte;
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 function TClassSymbol_MethodAddPos(Instance: TClassSymbol; const Name: string): Integer;
   external delphicoreide_bpl name '@Pasmgr@TClassSymbol@MethodAddPos$qqrx20System@UnicodeString';
 {$ENDIF}
@@ -104,7 +104,7 @@ function TClassSymbol_MethodAddPos(Instance: TClassSymbol; const Name: string): 
   external delphicoreide_bpl name '_ZN6Pasmgr12TClassSymbol12MethodAddPosEN6System13UnicodeStringE';
 {$ENDIF}
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 procedure TPascalClassCompleter_Complete;
   external delphicoreide_bpl name '@Completers@TPascalClassCompleter@Complete$qqrx20System@UnicodeString';
 {$ENDIF}
@@ -278,7 +278,7 @@ begin
   Result := TTableIterator.Create(ASymbolTable);
 end;
 
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 function MethodSymbolTableIteratorFactory(AClass: TClass; DL: Integer; ASymbolTable: TSymbolTable): TTableIterator;
 asm
   push ecx
@@ -303,7 +303,7 @@ begin
   // Win64: simplified fallback - just create the iterator without sorting hack
   Result := TTableIterator_Create(ASymbolTable);
 end;
-{$ENDIF CPUX86}
+{$ENDIF ~CPUX64}
 {begin
   // Sort all items that are already collected
   OrgTSortedThingList_SetSorted(ThingList, True);
@@ -316,7 +316,7 @@ end;}
 {-------------------------------------------------------------------------------------------------}
 
 procedure InstallDisableAlphaSortClassCompletion(Value: Boolean);
-{$IFDEF CPUX86}
+{$IFNDEF CPUX64}
 const
   CompleteSetSortedBytes: array[0..18] of SmallInt = (
     $B2, $01,             // mov dl,$01                                    //  0
@@ -428,6 +428,6 @@ end;
 begin
   // Win64: x86 byte-pattern matching is not applicable, feature not available
 end;
-{$ENDIF CPUX86}
+{$ENDIF ~CPUX64}
 
 end.

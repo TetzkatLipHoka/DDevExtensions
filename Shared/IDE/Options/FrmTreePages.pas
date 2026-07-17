@@ -121,6 +121,13 @@ uses
 
 {$R *.dfm}
 
+{$IF CompilerVersion < 18.5}
+// Pre-Delphi 2007 (e.g. Delphi 7) has no USER_DEFAULT_SCREEN_DPI. It is always 96
+// and there is no HiDPI on those versions, so MulDiv(..., PixelsPerInch, 96) is a no-op.
+const
+  USER_DEFAULT_SCREEN_DPI = 96;
+{$IFEND}
+
 resourcestring
   RsTreePageError = 'TreePage does not support the ITreePageComponent interface.';
 

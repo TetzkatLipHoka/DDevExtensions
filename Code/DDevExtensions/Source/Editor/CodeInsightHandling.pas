@@ -12,6 +12,14 @@ procedure InitPlugin(Unload: Boolean);
 
 implementation
 
+{$IF CompilerVersion < 20.0} // "IDE Version: 2009+" (no TIDEPopupListBox before); no-op stub
+
+procedure InitPlugin(Unload: Boolean);
+begin
+end;
+
+{$ELSE}
+
 uses
   Windows, Hooking, IDEHooks;
 
@@ -48,5 +56,6 @@ begin
     RestoreOrgCall(@TIDEPopupListBox_EditorKey, @OrgIDEPopupListBox_EditorKey);
 end;
 
+{$IFEND}
 
 end.

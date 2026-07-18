@@ -68,7 +68,7 @@ procedure InitPlugin(Unload: Boolean);
 
 implementation
 
-{.$DEFINE FrmUnitSelector} // MS
+{.$DEFINE FrmUnitSelector} // MS needs props cleanup
 uses
   {$IF Defined(FrmUnitSelector) AND ( CompilerVersion < 21.0 )} // Delphi 2009
   FrmUnitSelector,

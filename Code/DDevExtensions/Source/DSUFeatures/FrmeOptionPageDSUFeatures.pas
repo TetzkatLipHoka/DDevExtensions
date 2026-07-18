@@ -833,6 +833,7 @@ type
 var
   OrgCallOpenModuleFile: procedure(const ModuleName, EditorFileName: string);
 
+{$IF CompilerVersion >= 20.0} // 2009+: pre-2009 coreide has no Commonpasreg.OpenModuleFile hook point
 {$IFNDEF CPUX64}
 procedure OpenModuleFile(const ModuleName, EditorFileName: string);
   external delphicoreide_bpl name '@Commonpasreg@OpenModuleFile$qqrx20System@UnicodeStringt1';
@@ -841,6 +842,7 @@ procedure OpenModuleFile(const ModuleName, EditorFileName: string);
 procedure OpenModuleFile(const ModuleName, EditorFileName: string);
   external delphicoreide_bpl name '_ZN12Commonpasreg14OpenModuleFileEN6System13UnicodeStringES1_';
 {$ENDIF}
+{$IFEND}
 
 {$IFNDEF CPUX64}
 {$IF CompilerVersion >= 22.0} // Delphi XE+
@@ -848,7 +850,7 @@ function ExpandRootMacro(const InString: string; const AdditionalVars: TObject =
   external coreide_bpl name '@Uiutils@ExpandRootMacro$qqrx20System@UnicodeString' + _xp_ + '22Codemgr@TNameValueHash';
 {$ELSE}
 function ExpandRootMacro(const Name: string): string;
-  external coreide_bpl name '@Uiutils@ExpandRootMacro$qqrx20System@UnicodeString';
+  external coreide_bpl name '@Uiutils@ExpandRootMacro$qqrx' + {$IF CompilerVersion >= 20.0}'20System@UnicodeString'{$ELSE}'17System@AnsiString'{$IFEND};
 {$IFEND}
 {$ENDIF ~CPUX64}
 {$IFDEF CPUX64}
@@ -1236,6 +1238,7 @@ end;
 
 procedure TDSUFeaturesConfig.SetReplaceOpenFileAtCursor(const Value: Boolean);
 begin
+  {$IF CompilerVersion >= 20.0}
   if Value <> FReplaceOpenFileAtCursor then
   begin
     FReplaceOpenFileAtCursor := Value;
@@ -1244,6 +1247,9 @@ begin
     else
       RestoreOrgCall(@OpenModuleFile, @OrgCallOpenModuleFile);
   end;
+  {$ELSE} // pre-2009: no OpenModuleFile hook point
+  FReplaceOpenFileAtCursor := Value;
+  {$IFEND}
 end;
 
 {----------------------------------------------------------------------------------}
@@ -1345,7 +1351,7 @@ end;
 
 {$IFNDEF CPUX64}
 procedure TCustomEditControl_HelpKeyword(Editor: TControl);
-  external coreide_bpl name '@Editorcontrol@TCustomEditControl@HelpKeyword$qqrv';
+  external coreide_bpl name {$IF CompilerVersion >= 20.0}'@Editorcontrol@TCustomEditControl@HelpKeyword$qqrv'{$ELSE}'@Editors@TCustomEditControl@HelpKeyword$qqrv'{$IFEND}; // D7: unit is "Editors"
 {$ENDIF}
 {$IFDEF CPUX64}
 procedure TCustomEditControl_HelpKeyword(Editor: TControl);

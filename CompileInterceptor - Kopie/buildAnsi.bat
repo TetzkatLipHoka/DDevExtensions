@@ -1,8 +1,7 @@
 @echo off
 
 ::SET BORLAND=C:\Borland
-::SET BORLAND=C:\Program Files (x86)\Borland\
-SET BORLAND=C:\Delphi\
+SET BORLAND=C:\Program Files (x86)\Borland\
 SET P=%PATH%
 
 ::copy source\AppConsts.pas Installer\AppConsts.pas >NUL
@@ -17,8 +16,7 @@ if NOT ERRORLEVEL 1 goto OK
 
 :D7
 echo === Delphi 7 ==============================
-::SET PATH=%Borland%\Delphi7\Bin;C:\Windows\System32
-SET PATH=%Borland%\7\Bin;C:\Windows\System32
+SET PATH=%Borland%\Delphi7\Bin;C:\Windows\System32
 cd Source
 dcc32 -B -GD CompileInterceptor.dpr
 if ERRORLEVEL 1 goto Error1

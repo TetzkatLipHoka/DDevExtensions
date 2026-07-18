@@ -116,7 +116,7 @@ var
 
 {$IF CompilerVersion <= 20.0}
 procedure TCustomEditControl_RepeatSearch(AEditControl: TWinControl);
-  external coreide_bpl name '@Editorcontrol@TCustomEditControl@RepeatSearch$qqrv';
+  external coreide_bpl name {$IF CompilerVersion >= 20.0}'@Editorcontrol@TCustomEditControl@RepeatSearch$qqrv'{$ELSE}'@Editors@TCustomEditControl@RepeatSearch$qqrv'{$IFEND}; // D7: unit is "Editors"
 procedure EnvironmentOptionsAddr;
   external coreide_bpl name '@Envoptions@EnvironmentOptions';
 {$IFEND}

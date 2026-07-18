@@ -40,6 +40,7 @@
 {------------------------------------------------------------------------------}
 {$DEFINE INCLUDE_PROJECTSETTINGS}
 {$DEFINE INCLUDE_COMPILEPROGRESS}
+{$DEFINE INCLUDE_COMPILERENHANCEMENTS} // Treat warnings as errors (revived from the pre-2009 branch)
 {$DEFINE INCLUDE_IDEMENUHANDLER} // BDS IDE bugfix: Alt+F12 key bugfix
 {$DEFINE INCLUDE_UNITSELECTOR}
 {$DEFINE INCLUDE_KEYBINDINGS}

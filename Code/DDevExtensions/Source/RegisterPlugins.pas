@@ -25,6 +25,9 @@ uses
   FrmProjectSettingsSetVersioninfo, FocusEditor, CompileProgress,
   IDEMenuHandler, FrmeOptionPageKeybindings,
   FrmeOptionPageFileCleaner, FrmeOptionPageCompileBackup,
+  {$IFDEF INCLUDE_COMPILERENHANCEMENTS}
+  FrmeOptionPageCompilerEnhancements,
+  {$ENDIF INCLUDE_COMPILERENHANCEMENTS}
   {$IFDEF INCLUDE_STARTPARAMETERTEAM}
   FrmeOptionPageStartParameterTeam, // XE2 made the parameter configuration-aware
   {$ENDIF INCLUDE_STARTPARAMETERTEAM}
@@ -81,6 +84,11 @@ begin
     {$IFDEF INCLUDE_COMPILEPROGRESS}
     if DisabledPlugins.IndexOf('CompileProgress') = -1 then
       RegisterLateLoader(CompileProgress.InitPlugin);
+    {$ENDIF}
+
+    {$IFDEF INCLUDE_COMPILERENHANCEMENTS}
+    if DisabledPlugins.IndexOf('CompilerEnhancements') = -1 then
+      RegisterLateLoader(FrmeOptionPageCompilerEnhancements.InitPlugin);
     {$ENDIF}
 
     {$IFDEF INCLUDE_UNITSELECTOR}

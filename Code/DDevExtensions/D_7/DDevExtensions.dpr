@@ -95,7 +95,8 @@ uses
   DisableAlphaSortClassCompletion in '..\Source\DSUFeatures\DisableAlphaSortClassCompletion.pas',
   RemoveTextHeightProperty in '..\Source\FormDesignerHelpers\RemoveTextHeightProperty.pas',
   RemovePixelsPerInchProperty in '..\Source\FormDesignerHelpers\RemovePixelsPerInchProperty.pas',
-  FixAlphaControlsPNG in '..\Source\FormDesignerHelpers\FixAlphaControlsPNG.pas';
+  FixAlphaControlsPNG in '..\Source\FormDesignerHelpers\FixAlphaControlsPNG.pas',
+  FrmeOptionPageCompilerEnhancements in '..\Source\CompilerEnhancements\FrmeOptionPageCompilerEnhancements.pas' {FrameOptionPageCompilerEnhancements: TFrame};
 
 procedure DoneWizard;
 begin

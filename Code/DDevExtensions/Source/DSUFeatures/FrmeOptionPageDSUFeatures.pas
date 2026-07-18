@@ -207,7 +207,8 @@ begin
   chkDisableCodeFolding.Checked := FDSUFeatures.DisableCodeFolding;
 
   chkDisableSourceFormatterHotkey.Free;
-  chkIncBuildNumOnBuildOnly.Free;
+  // (chkIncBuildNumOnBuildOnly is already freed above - freeing it again corrupted the heap
+  //  and caused random AVs when closing the options dialog)
   {$IFEND}
   chkShowFileProjectInPrjMgr.Checked := FDSUFeatures.ShowFileProjectInPrjMgr;
   cbxEditorTabDblClickAction.ItemIndex := Ord(FDSUFeatures.EditorDblClickAction);
@@ -218,6 +219,20 @@ begin
   chkKillDExplore.Checked := FDSUFeatures.KillDExplore;
   chkConfirmDlgOnDebugCtrlF1.Checked := FDSUFeatures.ConfirmDlgOnDebugCtrlF1;
   chkDisableAlphaSortClassCompletion.Checked := FDSUFeatures.DisableAlphaSortClassCompletion;
+
+  { Hide options whose IDE hooks do not exist in this IDE version }
+  {$IF CompilerVersion < 20.0} // pre-2009
+  chkDisableAlphaSortClassCompletion.Visible := False;
+  chkDontBreakOnSpawnedProcesses.Visible := False;
+  chkShowAllFrames.Visible := False;
+  chkReplaceOpenFileAtCursor.Visible := False;
+  chkDisableCodeFolding.Visible := False; // code folding itself is 2005+, the hook 2009-only
+  {$IFEND}
+  {$IF CompilerVersion < 21.0} // pre-2010: Rtti-based VirtTreeHandler/StructureViewAPI stubs
+  chkShowFileProjectInPrjMgr.Visible := False;
+  HotKeyStructureViewSearch.Visible := False;
+  LabelStructureViewSearchHotkey.Visible := False;
+  {$IFEND}
 end;
 
 procedure TFrameOptionPageDSUFeatures.SaveData;

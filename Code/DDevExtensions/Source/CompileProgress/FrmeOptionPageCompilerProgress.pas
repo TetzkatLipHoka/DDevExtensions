@@ -88,6 +88,12 @@ begin
   chkLastCompileVersionInfo.Visible := False;
   edtLastCompileVersionInfoFormat.Visible := False;
   {$IFEND}
+  {$IF CompilerVersion < 20.0} // pre-2009: the hooks behind these options are 2009+/2010-only
+  chkReleaseCompilerUnitCache.Visible := False;
+  chkReleaseCompilerUnitCacheHigh.Visible := False;
+  cbxDisableRebuildDlg.Visible := False;
+  chkAskBeforeCompilingFileFromDiffernetProject.Visible := False;
+  {$IFEND}
 end;
 
 procedure TFrameOptionPageCompilerProgress.LoadData;

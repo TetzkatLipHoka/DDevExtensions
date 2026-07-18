@@ -71,3 +71,7 @@ modules/
 # Newer Delphi Versions create the *.res files in the build script
 *.res
 *.zipbugreport*.txt
+
+# Explorer backup copies
+*\ - Kopie/
+CompileInterceptor - Kopie/

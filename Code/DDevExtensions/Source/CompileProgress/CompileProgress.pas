@@ -37,6 +37,10 @@ type
     {$IFEND}
     FAskCompileFromDiffProject: Boolean;
     FAskCompileFromDiffProjectTemporary: Boolean;
+    {$IF CompilerVersion < 20.0} // pre-2009: no AutoCloseProgressDlg env option, we persist the setting
+    FAutoCloseProgressDialog: Boolean;
+    procedure AutoCloseFallbackChanged(Sender: TObject);
+    {$IFEND}
     {$IF CompilerVersion < 23.0} // XE2+ changed how version info works
     procedure UpdateLastCompileVersionInfo(const Project: IOTAProject);
     {$IFEND}
@@ -89,6 +93,9 @@ type
     {$IFEND}
     property AskCompileFromDiffProject: Boolean read FAskCompileFromDiffProject write SetAskCompileFromDiffProject;
     property AskCompileFromDiffProjectTemporary: Boolean read FAskCompileFromDiffProjectTemporary write FAskCompileFromDiffProjectTemporary;
+    {$IF CompilerVersion < 20.0}
+    property AutoCloseProgressDialog: Boolean read FAutoCloseProgressDialog write FAutoCloseProgressDialog;
+    {$IFEND}
   end;
 
 procedure InitPlugin(Unload: Boolean);
@@ -171,6 +178,13 @@ begin
       FormNativeProgress.ShowProgressBar(False);
 
     FormNativeProgress.CurrFile := FormNativeProgress.CurrFile  + '     Time: ' + TimeStr(t);
+
+    {$IF CompilerVersion < 20.0}
+    // pre-2009 IDEs keep the compile dialog open until OK is clicked; close it
+    // ourselves after a successful compile if the auto-close checkbox is set
+    if FormNativeProgress.AutoCloseFallback and (FormNativeProgress.ErrorCount = 0) then
+      FormNativeProgress.PostAutoClose;
+    {$IFEND}
   end;
 end;
 
@@ -547,6 +561,11 @@ begin
   inherited Create(AppDataDirectory + '\CompileProgress.xml', 'CompileProgress');
   FPasFiles := TStringList.Create;
   FormNativeProgress := TNativeProgressForm.Create;
+  {$IF CompilerVersion < 20.0}
+  // the config was loaded (inherited Create) before the form existed
+  FormNativeProgress.AutoCloseFallback := FAutoCloseProgressDialog;
+  FormNativeProgress.OnAutoCloseFallbackChanged := AutoCloseFallbackChanged;
+  {$IFEND}
 
   FIDENotifier := TIDENotifier.Create;
   FIDENotifier.OnBeforeCompile := BeforeCompile;
@@ -574,6 +593,9 @@ begin
   DisableRebuildDlg := True;
   {$IFEND}
   AutoSaveAfterSuccessfulCompile := False;
+  {$IF CompilerVersion < 20.0}
+  AutoCloseProgressDialog := False;
+  {$IFEND}
   AskCompileFromDiffProject := True;
   AskCompileFromDiffProjectTemporary := True;
   {$IF CompilerVersion < 23.0} // XE2+ changed how version info works
@@ -584,6 +606,17 @@ begin
   SetClearCompilerUnitCacheOtherStates(FReleaseCompilerUnitCache, FReleaseCompilerUnitCacheHigh);
   {$IFEND}
 end;
+
+{$IF CompilerVersion < 20.0}
+procedure TCompileProgress.AutoCloseFallbackChanged(Sender: TObject);
+begin
+  if FormNativeProgress.AutoCloseFallback <> FAutoCloseProgressDialog then
+  begin
+    FAutoCloseProgressDialog := FormNativeProgress.AutoCloseFallback;
+    Save;
+  end;
+end;
+{$IFEND}
 
 procedure TCompileProgress.AfterCompile(const Project: IOTAProject; Succeeded, IsCodeInsight: Boolean);
 begin

@@ -13,7 +13,7 @@ unit NativeProgressForm;
 interface
 
 uses
-  Windows, SysUtils, Classes, Graphics, Controls, Forms, StdCtrls, ExtCtrls, ComCtrls, TaskbarIntf;
+  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, StdCtrls, ExtCtrls, ComCtrls, TaskbarIntf;
 
 type
   TNativeProgressForm = class(TComponent)
@@ -24,6 +24,8 @@ type
     FLastPercentage: Integer;
     FProgressBar: TProgressBar;
     FAutoCloseCheckBox: TCheckBox;
+    FAutoCloseFallback: Boolean;
+    FOnAutoCloseFallbackChanged: TNotifyEvent;
     FTaskbarList: ITaskbarList;
     FTaskbarList3: ITaskbarList3;
     function GetCurrFile: string;
@@ -47,6 +49,7 @@ type
     procedure SetFilesCompiled(const Value: Integer);
     procedure SetMaxFiles(const Value: Integer);
     procedure SetProjectFilesCompiled(const Value: Integer);
+    procedure SetAutoCloseFallback(const Value: Boolean);
   protected
     function GetTaskbarFormHandle: HWND;
     procedure UpdateTaskbarProgress;
@@ -71,6 +74,12 @@ type
     procedure UpdateForm;
     procedure Cancel;
     procedure ShowProgressBar(AShow: Boolean);
+    procedure PostAutoClose;
+
+    { Backing store for the auto-close checkbox on IDEs without the
+      AutoCloseProgressDlg environment option (pre-2009). }
+    property AutoCloseFallback: Boolean read FAutoCloseFallback write SetAutoCloseFallback;
+    property OnAutoCloseFallbackChanged: TNotifyEvent read FOnAutoCloseFallbackChanged write FOnAutoCloseFallbackChanged;
 
     property Form: TCustomForm read GetForm;
     property StatusOverwrite: string write SetStatusOverwrite;
@@ -473,7 +482,7 @@ begin
     Exit;
   end;
 
-  // CreateAutoCloseCheckBox(Form); // disabled for testing: possibly collides with another expert's checkbox (user report)
+  CreateAutoCloseCheckBox(Form);
 
   if FMaxFiles = 0 then
     NewPercentage := 0
@@ -596,25 +605,69 @@ begin
   end;
 end;
 
+procedure TNativeProgressForm.SetAutoCloseFallback(const Value: Boolean);
+begin
+  FAutoCloseFallback := Value;
+  {$IF CompilerVersion < 20.0}
+  FCachedAutoClose := Value;
+  if (FAutoCloseCheckBox <> nil) and (FAutoCloseCheckBox.Checked <> Value) then
+  begin
+    FAutoCloseCheckBox.OnClick := nil; // Checked fires OnClick
+    FAutoCloseCheckBox.Checked := Value;
+    FAutoCloseCheckBox.OnClick := DoAutoCloseClick;
+  end;
+  {$IFEND}
+end;
+
+procedure TNativeProgressForm.PostAutoClose;
+var
+  Form: TCustomForm;
+  Btn: TButton;
+begin
+  { Posts a click on the dialog's OK/Cancel button so the caller's wait loop
+    (which keeps the dialog open after the compile) closes it. }
+  Form := GetForm;
+  if (Form <> nil) and Form.HandleAllocated then
+  begin
+    Btn := TButton(Form.FindComponent('CancelButton'));
+    if (TComponent(Btn) is TButton) and Btn.HandleAllocated then
+      PostMessage(Btn.Handle, BM_CLICK, 0, 0)
+    else
+      PostMessage(Form.Handle, WM_CLOSE, 0, 0);
+  end;
+end;
+
 procedure TNativeProgressForm.DoAutoCloseClick(Sender: TObject);
 begin
   FCachedAutoClose := TCheckBox(Sender).Checked;
+  {$IF CompilerVersion >= 20.0}
   try
     (BorlandIDEServices as IOTAServices).GetEnvironmentOptions.Values['AutoCloseProgressDlg'] := FCachedAutoClose;
   except
     // option not supported by this IDE version - checkbox stays cosmetic
   end;
+  {$ELSE}
+  FAutoCloseFallback := FCachedAutoClose;
+  if Assigned(FOnAutoCloseFallbackChanged) then
+    FOnAutoCloseFallbackChanged(Self); // CompileProgress persists the setting
+  {$IFEND}
 end;
 
 procedure TNativeProgressForm.CreateAutoCloseCheckBox(Form: TCustomForm);
+{$IF CompilerVersion >= 20.0}
 var
   Value: Variant;
+{$IFEND}
 begin
   { Injects an "Automatically close on successful compile" checkbox into the
     IDE's compile progress dialog (bottom left, same row as the progress bar).
-    It toggles the IDE's AutoCloseProgressDlg environment option. }
+    2009+: toggles the IDE's AutoCloseProgressDlg environment option.
+    Pre-2009 IDEs have no such option (the dialog always waits for OK), so
+    DDevExtensions persists the setting itself and closes the dialog in
+    HookedStartCompile after a successful compile. }
   if (FAutoCloseCheckBox <> nil) or (Form = nil) then
     Exit;
+  {$IF CompilerVersion >= 20.0}
   try
     Value := (BorlandIDEServices as IOTAServices).GetEnvironmentOptions.Values['AutoCloseProgressDlg'];
     if VarIsNull(Value) or VarIsEmpty(Value) then
@@ -623,6 +676,9 @@ begin
   except
     Exit; // option unknown to this IDE - do not offer the checkbox
   end;
+  {$ELSE}
+  FCachedAutoClose := FAutoCloseFallback;
+  {$IFEND}
 
   FAutoCloseCheckBox := TCheckBox.Create(Form);
   FAutoCloseCheckBox.FreeNotification(Self);

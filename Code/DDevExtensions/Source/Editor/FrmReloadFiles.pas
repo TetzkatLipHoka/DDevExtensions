@@ -17,6 +17,12 @@ unit FrmReloadFiles;
 
 interface
 
+{$IF CompilerVersion < 20.0} // needs DocModuleHandler (2009+ coreide binding); no-op stub for older versions
+
+procedure InitPlugin(Unload: Boolean);
+
+{$ELSE}
+
 uses
   Windows, Messages, SysUtils, Variants, Classes, Contnrs, Graphics, Controls, Forms, Dialogs, FrmBase,
   ComCtrls, StdCtrls, ExtCtrls, ImgList, Menus, ToolsAPI,
@@ -79,7 +85,17 @@ type
 
 procedure InitPlugin(Unload: Boolean);
 
+{$IFEND}
+
 implementation
+
+{$IF CompilerVersion < 20.0}
+
+procedure InitPlugin(Unload: Boolean);
+begin
+end;
+
+{$ELSE}
 
 uses
   Hooking, IDEHooks, StrUtils, ActiveX, Registry, ComObj, IDEUtils, ShellAPI, AppConsts,
@@ -374,6 +390,7 @@ const
   UTF8BOM: array[0..2] of Byte = ($EF, $BB, $BF);
   ShareFlags: DWORD = FILE_SHARE_READ or FILE_SHARE_DELETE or FILE_SHARE_WRITE;
 
+  {$IF CompilerVersion >= 20.0} // 2009+
   function GetFileEncoding(const FileName: string): TEncoding;
   var
     BOM: TBytes;
@@ -399,6 +416,26 @@ const
       CloseHandle(DiskFileHandle);
     end;
   end;
+  {$ELSE}
+  function DiskFileIsUtf8(const FileName: string): Boolean;
+  var
+    BOM: array[0..2] of Byte;
+    DiskFileHandle: THandle;
+    BytesRead: DWORD;
+  begin
+    DiskFileHandle := CreateFile(PChar(FileName), GENERIC_READ, ShareFlags, nil, OPEN_EXISTING, 0, 0);
+    if DiskFileHandle = INVALID_HANDLE_VALUE then
+      RaiseLastOSError;
+    try
+      BytesRead := 0;
+      ReadFile(DiskFileHandle, BOM, SizeOf(BOM), BytesRead, nil);
+      Result := (BytesRead = SizeOf(BOM)) and
+        (BOM[0] = UTF8BOM[0]) and (BOM[1] = UTF8BOM[1]) and (BOM[2] = UTF8BOM[2]);
+    finally
+      CloseHandle(DiskFileHandle);
+    end;
+  end;
+  {$IFEND}
 
 var
   FormEditor: IOTAFormEditor;
@@ -410,9 +447,13 @@ var
   StartupInfo: TStartupInfo;
   CmdLine: string;
   Item: TWaitItem;
+  {$IF CompilerVersion >= 20.0} // 2009+
   Encoding: TEncoding;
   Data: TBytes;
   WideData: UnicodeString;
+  {$ELSE}
+  AnsiData: AnsiString;
+  {$IFEND}
   Utf8Data: UTF8String;
   FormStream: IStream;
 begin
@@ -435,6 +476,7 @@ begin
         end
         else if Supports(Editor, IOTASourceEditor, SourceEditor) then
         begin
+          {$IF CompilerVersion >= 20.0} // 2009+
           Encoding := GetFileEncoding(Editor.FileName);
           Utf8Data := GetEditorSource(SourceEditor);
           if Utf8Data <> '' then
@@ -458,6 +500,25 @@ begin
                 FileStream.Write(Data[0], Length(Data));
             end;
           end;
+          {$ELSE}
+          Utf8Data := GetEditorSource(SourceEditor);
+          if Utf8Data <> '' then
+          begin
+            // Write with the encoding of the file on disk to allow the differ to work better (Beyond Compare doesn't have a problem but TSVN has)
+            if DiskFileIsUtf8(Editor.FileName) then
+            begin
+              FileStream.Write(UTF8BOM, SizeOf(UTF8BOM));
+              FileStream.Write(PAnsiChar(Utf8Data)^, Length(Utf8Data));
+            end
+            else
+            begin
+              AnsiData := Utf8ToAnsi(Utf8Data);
+              Utf8Data := '';
+              if AnsiData <> '' then
+                FileStream.Write(PAnsiChar(AnsiData)^, Length(AnsiData));
+            end;
+          end;
+          {$IFEND}
         end;
       finally
         FileStream.Free;
@@ -1167,5 +1228,7 @@ initialization
 
 finalization
   DeallocateHWnd(TWaitItem.WndHandle);
+
+{$IFEND}
 
 end.

@@ -2,6 +2,8 @@ unit VirtTreeHandler;
 
 interface
 
+{$IF CompilerVersion >= 21.0} // Delphi 2010+ (extended RTTI); empty stub for older versions
+
 {$RTTI EXPLICIT METHODS([vcPrivate, vcProtected, vcPublic, vcPublished])
                 PROPERTIES([vcPrivate, vcProtected, vcPublic, vcPublished])
                 FIELDS([vcPrivate, vcProtected, vcPublic, vcPublished])}
@@ -111,7 +113,11 @@ type
     property Images: TCustomImageList read GetImages;
   end;
 
+{$IFEND}
+
 implementation
+
+{$IF CompilerVersion >= 21.0}
 
 uses
   TypInfo;
@@ -357,6 +363,7 @@ begin
 
 end;
 
+{$IFEND}
 
 end.
 

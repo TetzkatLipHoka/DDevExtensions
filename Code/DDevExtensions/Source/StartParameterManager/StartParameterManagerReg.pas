@@ -2,6 +2,12 @@ unit StartParameterManagerReg;
 
 interface
 
+{$IF CompilerVersion < 20.0} // RunParams/toolbar hooks below use 2009+ IDE symbols; no-op stub for older versions
+
+procedure InitPlugin(Unload: Boolean);
+
+{$ELSE}
+
 uses
   Windows, SysUtils, Classes, ActnList, Controls, ComCtrls, ToolsAPI, StartParameterCtrl;
 
@@ -19,7 +25,17 @@ type
 
 procedure InitPlugin(Unload: Boolean);
 
+{$IFEND}
+
 implementation
+
+{$IF CompilerVersion < 20.0}
+
+procedure InitPlugin(Unload: Boolean);
+begin
+end;
+
+{$ELSE}
 
 uses
   TypInfo, // XE
@@ -271,5 +287,7 @@ begin
   else
     FActionCustomize.Hint := '';
 end;
+
+{$IFEND}
 
 end.

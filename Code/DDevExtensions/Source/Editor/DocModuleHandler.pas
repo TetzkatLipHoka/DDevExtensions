@@ -2,6 +2,8 @@ unit DocModuleHandler;
 
 interface
 
+{$IF CompilerVersion >= 20.0} // binds to 2009+ coreide internals (method externals, 2009+ mangling); empty unit for older versions
+
 uses
   Windows, SysUtils, Classes, ToolsAPI, Dialogs, Hooking, IDEHooks, ToolsAPIHelpers;
 
@@ -227,7 +229,11 @@ var
 function InitDocModuleHandler: Boolean;
 function IsEmbeddedDesigner: Boolean;
 
+{$IFEND}
+
 implementation
+
+{$IF CompilerVersion >= 20.0}
 
 {$IF CompilerVersion >= 21.0}
 uses
@@ -770,5 +776,7 @@ begin
 
   Result := True;
 end;
+
+{$IFEND}
 
 end.

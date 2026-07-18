@@ -552,10 +552,14 @@ end;
 
 function TNativeProgressForm.GetTaskbarFormHandle: HWND;
 begin
+  {$IF CompilerVersion >= 21.0} // 2010+ (MainFormOnTaskBar is 2007+, MainFormHandle is 2010+)
   if Application.MainFormOnTaskBar then
     Result := Application.MainFormHandle
   else
     Result := Application.Handle;
+  {$ELSE}
+  Result := Application.Handle;
+  {$IFEND}
 end;
 
 procedure TNativeProgressForm.UpdateTaskbarProgress;

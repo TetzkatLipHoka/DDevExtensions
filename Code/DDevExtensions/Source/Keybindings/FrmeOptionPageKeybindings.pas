@@ -309,7 +309,7 @@ var
       Ch := #0;
   end;
 
-  function IsWhiteSpace(Ch: Char): Boolean; inline;
+  function IsWhiteSpace(Ch: Char): Boolean; {$IFDEF SUPPORTS_INLINE}inline;{$ENDIF}
   begin
     Result := (Ch = ' ') or (Ch = #9);
   end;

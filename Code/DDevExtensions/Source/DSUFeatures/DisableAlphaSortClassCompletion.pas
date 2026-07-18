@@ -16,6 +16,12 @@ procedure InstallDisableAlphaSortClassCompletion(Value: Boolean);
 
 implementation
 
+{$IF CompilerVersion < 20.0} // mirrors 2009+ compiler internals; not available on D7
+procedure InstallDisableAlphaSortClassCompletion(Value: Boolean);
+begin
+end;
+{$ELSE}
+
 uses
   Windows, SysUtils, Classes, TypInfo, Hooking, IDEHooks;
 
@@ -429,5 +435,7 @@ begin
   // Win64: x86 byte-pattern matching is not applicable, feature not available
 end;
 {$ENDIF ~CPUX64}
+
+{$IFEND}
 
 end.

@@ -29,7 +29,7 @@ type
     {$IF CompilerVersion < 36.0}
     FReleaseCompilerUnitCache: Boolean;
     FReleaseCompilerUnitCacheHigh: Boolean;
-    {$ENDIF}
+    {$IFEND}
     FAutoSaveAfterSuccessfulCompile: Boolean;
     {$IF CompilerVersion < 23.0} // XE2+ changed how version info works
     FLastCompileVersionInfo: Boolean;
@@ -45,7 +45,7 @@ type
     {$IF CompilerVersion < 36.0}
     procedure SetReleaseCompilerUnitCache(const Value: Boolean);
     procedure SetReleaseCompilerUnitCacheHigh(const Value: Boolean);
-    {$ENDIF}
+    {$IFEND}
   {$IF CompilerVersion < 22.0} // XE has its own option
   private
     FDisableRebuildDlg: Boolean;
@@ -62,14 +62,14 @@ type
 
     { ICompileInterceptor }
     function GetOptions: TCompileInterceptOptions; stdcall;
-    function GetVirtualFile(Filename: PWideChar): IVirtualStream; stdcall;
-    function AlterFile(Filename: PWideChar; Content: PByte; FileDate, FileSize: Integer): IVirtualStream; stdcall;
-    procedure InspectFilename(Filename: PWideChar; FileMode: TInspectFileMode); stdcall;
+    function GetVirtualFile(Filename: PChar{PWideChar}): IVirtualStream; stdcall;
+    function AlterFile(Filename: PChar{PWideChar}; Content: PByte; FileDate, FileSize: Integer): IVirtualStream; stdcall;
+    procedure InspectFilename(Filename: PChar{PWideChar}; FileMode: TInspectFileMode); stdcall;
     function AlterMessage(IsCompilerMessage: Boolean; var MsgKind: TMsgKind;
-      var Code: Integer; const Filename: IWideString; var Line, Column: Integer;
-      const Msg: IWideString): Boolean; stdcall;
-    procedure CompileProject(ProjectFilename: PWideChar; UnitPaths: PWideChar;
-      SourcePaths: PWideChar; DcuOutputDir: PWideChar; IsCodeInsight: Boolean;
+      var Code: Integer; const Filename: {$IFDEF UNICODE}IWideString{$ELSE}IAnsiString{$ENDIF}; var Line, Column: Integer;
+      const Msg: {$IFDEF UNICODE}IWideString{$ELSE}IAnsiString{$ENDIF}): Boolean; stdcall;
+    procedure CompileProject(ProjectFilename: PChar{PWideChar}; UnitPaths: PChar;
+      SourcePaths: PChar; DcuOutputDir: PChar; IsCodeInsight: Boolean;
       var Cancel: Boolean); stdcall;
   public
     constructor Create;
@@ -78,7 +78,7 @@ type
     {$IF CompilerVersion < 36.0} // no longer supported as of Delphi 12
     property ReleaseCompilerUnitCache: Boolean read FReleaseCompilerUnitCache write SetReleaseCompilerUnitCache;
     property ReleaseCompilerUnitCacheHigh: Boolean read FReleaseCompilerUnitCacheHigh write SetReleaseCompilerUnitCacheHigh;
-    {$ENDIF}
+    {$IFEND}
     {$IF CompilerVersion < 22.0} // XE has its own option
     property DisableRebuildDlg: Boolean read FDisableRebuildDlg write SetDisableRebuildDlg;
     {$IFEND}
@@ -190,7 +190,7 @@ begin
   { Compile/Build/Check/... }
   Result := OrgCallProjectGroupCompileActive(Instance, CompileMode, Wait);
 end;
-{$ELSE}
+{$ELSEIF CompilerVersion >= 20.0} // Delphi 2009
 var
   OrgCompileActiveProject, OrgCallCompileActiveProject: function(Instance: TObject; CompileMode: TCompileMode; Wait: Boolean): Boolean;
 
@@ -204,6 +204,7 @@ begin
 end;
 {$IFEND}
 
+{$IF CompilerVersion >= 20.0} // 2009+ (uses OTA project dependencies and IDE hooks not available before)
 function CompileActiveProject(Instance: TObject; CompileMode: TCompileMode; Wait: Boolean): Boolean;
 
   procedure CollectDependencies(const Dependencies: IOTAProjectGroupProjectDependencies;
@@ -357,6 +358,7 @@ begin
   end;
   Result := CallOrgProjectGroupCompileActive(Instance, CompileMode, Wait);
 end;
+{$IFEND}
 
 {$IF CompilerVersion >= 21.0} // Delphi 2010+
 {$IFNDEF CPUX64}
@@ -459,7 +461,7 @@ begin
 end;
 {$IFEND}
 
-{$IF CompilerVersion < 21.0} // Delphi 2009
+{$IF (CompilerVersion >= 20.0) and (CompilerVersion < 21.0)} // Delphi 2009
 procedure InitPlugin(Unload: Boolean);
 const
   ProjectMakeCode: array[0..29] of SmallInt = (
@@ -514,6 +516,30 @@ begin
 end;
 {$IFEND}
 
+{$IF CompilerVersion < 20.0} // pre-2009: the TAppBuilder hook patterns above are 2009+ specific
+procedure InitPlugin(Unload: Boolean);
+const
+  StartCompileSymbol = '@Comprgrs@TProgressForm@StartCompile$qqrv';
+var
+  coreideLib: THandle;
+begin
+  if not Unload then
+  begin
+    GlobalCompileProgress := TCompileProgress.Create;
+    coreideLib := GetModuleHandle(coreide_bpl);
+
+    @OrgStartCompile := DbgStrictGetProcAddress(coreideLib, StartCompileSymbol);
+    if Assigned(OrgStartCompile) then
+      @OrgCallStartCompile := RedirectOrgCall(@OrgStartCompile, @HookedStartCompile);
+  end
+  else
+  begin
+    RestoreOrgCall(@OrgStartCompile, @OrgCallStartCompile);
+    GlobalCompileProgress.Free;
+  end;
+end;
+{$IFEND}
+
 { TCompileProgress }
 
 constructor TCompileProgress.Create;
@@ -543,7 +569,7 @@ begin
   {$IF CompilerVersion < 36.0} // Delphi 12
   ReleaseCompilerUnitCache := False;
   ReleaseCompilerUnitCacheHigh := True;
-  {$ENDIF}
+  {$IFEND}
   {$IF CompilerVersion < 22.0} // XE has its own option
   DisableRebuildDlg := True;
   {$IFEND}
@@ -556,7 +582,7 @@ begin
 
   {$IF CompilerVersion < 36.0}
   SetClearCompilerUnitCacheOtherStates(FReleaseCompilerUnitCache, FReleaseCompilerUnitCacheHigh);
-  {$ENDIF}
+  {$IFEND}
 end;
 
 procedure TCompileProgress.AfterCompile(const Project: IOTAProject; Succeeded, IsCodeInsight: Boolean);
@@ -628,7 +654,7 @@ begin
   FReleaseCompilerUnitCacheHigh := Value;
   SetClearCompilerUnitCacheOtherStates(FReleaseCompilerUnitCache, FReleaseCompilerUnitCacheHigh);
 end;
-{$ENDIF}
+{$IFEND}
 
 {$IF CompilerVersion < 22.0} // XE has its own option
 procedure TCompileProgress.SetDisableRebuildDlg(const Value: Boolean);
@@ -720,7 +746,7 @@ const
   );
 
 var
-  P, EndP: PByte;
+  P, EndP: PAnsiChar; // PAnsiChar instead of PByte: D7 has no PByte pointer math
   I: Integer;
   Found: Boolean;
   n: DWORD;
@@ -734,14 +760,14 @@ begin
     begin
       while P < EndP do
       begin
-        while (P < EndP) and (P[0] <> $8B) do
+        while (P < EndP) and (Byte(P[0]) <> $8B) do
           Inc(P);
         if (P < EndP) then
         begin
           Found := True;
           for I := 0 to High(Bytes) do
           begin
-            if (Bytes[I] <> -1) and (P[I] <> Byte(Bytes[I])) then
+            if (Bytes[I] <> -1) and (Byte(P[I]) <> Byte(Bytes[I])) then
             begin
               Found := False;
               Break;
@@ -799,24 +825,24 @@ begin
   Result := CIO_INSPECTFILENAMES;
 end;
 
-procedure TCompileProgress.CompileProject(ProjectFilename, UnitPaths, SourcePaths, DcuOutputDir: PWideChar;
+procedure TCompileProgress.CompileProject(ProjectFilename, UnitPaths, SourcePaths, DcuOutputDir: PChar;
   IsCodeInsight: Boolean; var Cancel: Boolean);
 begin
 end;
 
-function TCompileProgress.AlterFile(Filename: PWideChar; Content: PByte; FileDate, FileSize: Integer): IVirtualStream;
+function TCompileProgress.AlterFile(Filename: PChar; Content: PByte; FileDate, FileSize: Integer): IVirtualStream;
 begin
   Result := nil;
 end;
 
 function TCompileProgress.AlterMessage(IsCompilerMessage: Boolean;
-  var MsgKind: TMsgKind; var Code: Integer; const Filename: IWideString;
-  var Line, Column: Integer; const Msg: IWideString): Boolean;
+  var MsgKind: TMsgKind; var Code: Integer; const Filename: {$IFDEF UNICODE}IWideString{$ELSE}IAnsiString{$ENDIF};
+  var Line, Column: Integer; const Msg: {$IFDEF UNICODE}IWideString{$ELSE}IAnsiString{$ENDIF}): Boolean;
 begin
   Result := False;
 end;
 
-function TCompileProgress.GetVirtualFile(Filename: PWideChar): IVirtualStream;
+function TCompileProgress.GetVirtualFile(Filename: PChar): IVirtualStream;
 begin
   Result := nil;
 end;
@@ -826,7 +852,7 @@ begin
   FormNativeProgress.ProjectFilesCompiled := FormNativeProgress.ProjectFilesCompiled + 1;
 end;
 
-procedure TCompileProgress.InspectFilename(Filename: PWideChar; FileMode: TInspectFileMode);
+procedure TCompileProgress.InspectFilename(Filename: PChar; FileMode: TInspectFileMode);
 var
   Index: Integer;
   SFilename: string;
@@ -846,8 +872,10 @@ begin
       begin
         if GetCurrentThreadId = MainThreadId then
           FormNativeProgress.ProjectFilesCompiled := FormNativeProgress.ProjectFilesCompiled + 1
+        {$IF CompilerVersion >= 18.0} // 2006+ (TThread.Queue; pre-2006 compiles in the main thread anyway)
         else
-          TThread.Queue(nil, UpdateInMainThread);
+          TThread.Queue(nil, UpdateInMainThread)
+        {$IFEND};
       end;
     end;
     {if AnsiCompareText(ExtractFileExt(SFilename), '.pas') = 0 then

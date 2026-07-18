@@ -10,12 +10,20 @@ procedure SetClearCompilerUnitCacheOtherStates(Enabled, OnlyHighUsge: Boolean);
 
 implementation
 
+{$IF CompilerVersion >= 20.0}
 uses
   Windows, PsAPI, SysUtils, Hooking, IDEHooks, IDEUtils,
   {$IF CompilerVersion >= 23.0}
   PlatformAPI,
   {$IFEND}
   ToolsAPI;
+{$IFEND}
+
+{$IF CompilerVersion < 20.0} // pre-2009: the coreide imports below use D2009+ mangled names
+procedure SetClearCompilerUnitCacheOtherStates(Enabled, OnlyHighUsge: Boolean);
+begin
+end;
+{$ELSE}
 
 var
   ClearOtherStatesEnabled: Boolean = False;
@@ -252,5 +260,6 @@ begin
       RestoreOrgCall(@TCompiler_Compile, @Org_TCompiler_Compile);
   end;
 end;
+{$IFEND}
 
 end.

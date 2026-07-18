@@ -145,9 +145,23 @@ begin
 end;
 
 function FindModuleInfo(Project: IOTAProject; const Filename: string): IOTAModuleInfo;
+{$IF CompilerVersion >= 17.0} // 2005+
 begin
   Result := Project.FindModuleInfo(Filename);
 end;
+{$ELSE}
+var
+  I: Integer;
+begin
+  for I := 0 to Project.GetModuleCount - 1 do
+  begin
+    Result := Project.GetModule(I);
+    if (Result <> nil) and AnsiSameText(Result.FileName, Filename) then
+      Exit;
+  end;
+  Result := nil;
+end;
+{$IFEND}
 
 function GetEditorSource(Editor: IOTASourceEditor): UTF8String;
 const
@@ -457,6 +471,7 @@ begin
     Result := nil;
 end;
 
+{$IF CompilerVersion >= 17.0} // 2005+ (D7's ToolsAPI has no palette interfaces)
 function FindPaletteItemByName(const APaletteName, AItemName: string): IOTABasePaletteItem;
 var
   CompPal: TCategoryButtons;
@@ -494,6 +509,7 @@ begin
   end;
   Result := nil;
 end;
+{$IFEND}
 
 function GetCurrentEditor: IOTAEditor;
 var
@@ -556,23 +572,35 @@ end;
 
 function IsCppPersonality(Project: IOTAProject): Boolean;
 begin
+  {$IF CompilerVersion >= 17.0} // 2005+; pre-Galileo IDEs have no personalities
   if Project = nil then
     Project := GetActiveProject;
   Result := (Project <> nil) and (Project.Personality = sCBuilderPersonality);
+  {$ELSE}
+  Result := False;
+  {$IFEND}
 end;
 
 function IsDelphiPersonality(Project: IOTAProject): Boolean; // Win32
 begin
   if Project = nil then
     Project := GetActiveProject;
+  {$IF CompilerVersion >= 17.0} // 2005+
   Result := (Project <> nil) and (Project.Personality = sDelphiPersonality);
+  {$ELSE}
+  Result := Project <> nil;
+  {$IFEND}
 end;
 
 function IsDelphiNetPersonality(Project: IOTAProject): Boolean;
 begin
+  {$IF CompilerVersion >= 17.0} // 2005+
   if Project = nil then
     Project := GetActiveProject;
   Result := (Project <> nil) and (Project.Personality = sDelphiDotNetPersonality);
+  {$ELSE}
+  Result := False;
+  {$IFEND}
 end;
 
 {$IF CompilerVersion >= 23.0} // XE2+

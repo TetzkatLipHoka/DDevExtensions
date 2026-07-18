@@ -18,7 +18,10 @@ uses
   {$IF CompilerVersion >= 23.0}
   PlatformAPI,
   {$IFEND}
-  DCCStrs, FrmTreePages, PluginConfig, StdCtrls,
+  {$IF CompilerVersion >= 20.0} // 2009+ (DCCStrs/IOTAProjectOptionsConfigurations)
+  DCCStrs,
+  {$IFEND}
+  FrmTreePages, PluginConfig, StdCtrls,
   ModuleData, FrmeBase, ExtCtrls, ActnList, Menus, VirtTreeHandler, ComCtrls;
 
 type
@@ -72,11 +75,13 @@ type
     FTimerStructureView: TTimer;
     FLastParsingDots: Integer;
     FParseThread: TThread;
+    {$IF CompilerVersion >= 21.0} // Rtti-based VirtTreeHandler (2010+)
     FPrjMgrTree: TIDEVirtualTreeHandler;
     FOrgPMGetTextEvent: TVSTGetTextEvent;
 
     procedure PMGetText(Sender: TObject; Node: PVirtualNode; Column: Integer;
       TextType: TVSTTextType; var CellText: WideString);
+    {$IFEND}
 
     procedure SetRegValue(var Value: Boolean; NewValue: Boolean; const ValueName: string);
     function GetOptionPages: TTreePage; override;
@@ -384,7 +389,7 @@ begin
   begin
     EditWindow := FindForm('EditWindow_0', 'TEditWindow');
     if EditWindow <> nil then
-      PByte(PByte(EditWindow) + FZoomModeOffset)^ := ZoomModes[FEditorDblClickAction];
+      PByte(PAnsiChar(Pointer(EditWindow)) + FZoomModeOffset)^ := ZoomModes[FEditorDblClickAction];
   end;
 end;
 
@@ -543,7 +548,7 @@ end;
 
 destructor TDSUFeaturesConfig.Destroy;
 begin
-  {$IF CompilerVersion < 21.0} // Delphi 2009
+  {$IF (CompilerVersion >= 20.0) and (CompilerVersion < 21.0)} // Delphi 2009
   UnhookFunction(DisabledGetRegionsHook);
   CodeRestore(ProcessAddCommandHook);
   CodeRestore(Package_AddProjectModuleHook);
@@ -622,6 +627,13 @@ end;
 var
   TProcess_stopOnFirstAddrHook: TRedirectCode;
 
+{$IF CompilerVersion < 20.0} // pre-2009: debugger BPL import below not available
+procedure TDSUFeaturesConfig.SetDontBreakOnSpawnedProcesses(const Value: Boolean);
+begin
+  FDontBreakOnSpawnedProcesses := Value;
+end;
+{$ELSE}
+
 {$IFNDEF CPUX64}
 const
   {$IF CompilerVersion >= 28.0} // XE7+
@@ -658,6 +670,7 @@ begin
       CodeRedirect(@TProcess_stopOnFirstAddr, @DbgStopOnFirstAddr, TProcess_stopOnFirstAddrHook);
   end;
 end;
+{$IFEND}
 
 {$IF CompilerVersion >= 21.0} // Delphi 2010+
 procedure TDSUFeaturesConfig.SetDisableSourceFormatterHotkey(Value: Boolean);
@@ -693,7 +706,19 @@ begin
 end;
 {$IFEND}
 
-{$IF CompilerVersion < 21.0} // Delphi 2009
+{$IF CompilerVersion < 20.0} // pre-2009: the IDE has no code folding; hook symbols below are 2009+
+procedure TDSUFeaturesConfig.SetDisableCodeFolding(const Value: Boolean);
+begin
+  FDisableCodeFolding := Value;
+end;
+
+procedure TDSUFeaturesConfig.SetReplacePackageAddContain(const Value: Boolean);
+begin
+  FReplacePackageAddContain := Value;
+end;
+{$IFEND}
+
+{$IF (CompilerVersion >= 20.0) and (CompilerVersion < 21.0)} // Delphi 2009
 function DisabledGetRegions(Instance: TObject): TOTARegions;
 begin
   Result := nil;
@@ -862,7 +887,7 @@ const
   begin
     Result := GetActiveProject();
     if Result <> nil then
-      if Result.FindModuleInfo(FileName) <> nil then
+      if FindModuleInfo(Result, FileName) <> nil then // ToolsAPIHelpers (D7's IOTAProject has no FindModuleInfo)
         Exit;
 
     Group := GetActiveProjectGroup();
@@ -871,7 +896,7 @@ const
       for ProjectIndex := 0 to Group.ProjectCount - 1 do
       begin
         Result := Group.Projects[ProjectIndex];
-        if AnsiSameText(FileName, Result.FileName) or (Result.FindModuleInfo(FileName) <> nil) then
+        if AnsiSameText(FileName, Result.FileName) or (FindModuleInfo(Result, FileName) <> nil) then
           Exit;
         for I := 0 to Result.ModuleFileCount - 1 do
           if AnsiSameText(FileName, Result.ModuleFileEditors[I].FileName) then
@@ -921,8 +946,10 @@ const
 
   procedure AppendProjectSearchDirs(var SearchPaths: string; const Project: IOTAProject);
   var
+    {$IF CompilerVersion >= 20.0} // 2009+
     OptionConfig: IOTAProjectOptionsConfigurations;
     BuildConfig: IOTABuildConfiguration;
+    {$IFEND}
     Dirs: TStrings;
     CurDir: string;
     I: Integer;
@@ -931,6 +958,7 @@ const
 
     Dirs := TStringList.Create;
     try
+      {$IF CompilerVersion >= 20.0} // 2009+
       if Supports(Project.ProjectOptions, IOTAProjectOptionsConfigurations, OptionConfig) then
       begin
         BuildConfig := OptionConfig.ActiveConfiguration;
@@ -941,6 +969,7 @@ const
           BuildConfig.GetValues(DCCStrs.sUnitSearchPath, Dirs);
       end
       else
+      {$IFEND}
         SplitPaths(Dirs, VarToStrDef(Project.ProjectOptions.Values['UnitDir'], ''));
 
       CurDir := GetCurrentDir;
@@ -1055,7 +1084,12 @@ begin
       Module := ModuleInfo.OpenModule;
       if Module <> nil then
       begin
+        {$IF CompilerVersion >= 17.0} // 2005+
         Module.ShowFilename(ModuleInfo.FileName);
+        {$ELSE} // D7's IOTAModule has no ShowFilename; show the module's main editor
+        if Module.GetModuleFileCount > 0 then
+          Module.GetModuleFileEditor(0).Show;
+        {$IFEND}
         Exit;
       end;
     end;
@@ -1218,6 +1252,13 @@ var
   TDelphiProjectModuleHandler_GetFormListHook: TRedirectCode;
   TDelphiProjectModuleHandler_GetFormList: procedure(Instance: TObject; List: TStrings);
 
+{$IF CompilerVersion < 20.0} // pre-2009: load-time imports below use 2009+ mangled names
+procedure TDSUFeaturesConfig.SetShowAllFrames(const Value: Boolean);
+begin
+  FShowAllFrames := Value;
+end;
+{$ELSE}
+
 {$IFNDEF CPUX64}
 procedure TPascalProjectUpdaterClass;
   external delphicoreide_bpl name '@Pasmgr@TPascalProjectUpdater@';
@@ -1298,6 +1339,7 @@ begin
     end;
   end;
 end;
+{$IFEND}
 
 {----------------------------------------------------------------------------------}
 
@@ -1362,6 +1404,7 @@ begin
   SetRegValue(FDisableEditorClearType, Value, 'DDevExDisableEditorClearType');
 end;}
 
+{$IF CompilerVersion >= 21.0} // Rtti-based VirtTreeHandler (2010+)
 procedure TDSUFeaturesConfig.PMGetText(Sender: TObject; Node: PVirtualNode; Column: Integer;
   TextType: TVSTTextType; var CellText: WideString);
 type
@@ -1409,6 +1452,14 @@ begin
   end;
 end;
 
+{$ELSE}
+procedure TDSUFeaturesConfig.SetShowFileProjectInPrjMgr(const Value: Boolean);
+begin
+  FShowFileProjectInPrjMgr := Value;
+end;
+{$IFEND}
+
+{$IF CompilerVersion >= 21.0}
 procedure TDSUFeaturesConfig.SetShowFileProjectInPrjMgr(const Value: Boolean);
 var
   ProjectManagerForm: TCustomForm;
@@ -1443,6 +1494,7 @@ begin
     FPrjMgrTree.Invalidate;
   end;
 end;
+{$IFEND}
 
 procedure TDSUFeaturesConfig.SetStructureViewSearchHotKey(const Value: TShortCut);
 begin

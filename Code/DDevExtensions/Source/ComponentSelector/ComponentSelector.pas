@@ -12,6 +12,19 @@ unit ComponentSelector;
 
 interface
 
+{$IF CompilerVersion < 18.0} // pre-Galileo IDEs have no TCategoryButtons palette/PaletteAPI; no-op stub
+uses
+  Classes;
+
+type
+  TComponentSelector = class(TComponent)
+  end;
+
+function ComponentSelectorCtrl: TComponentSelector;
+procedure InitPlugin(Unload: Boolean);
+
+{$ELSE}
+
 uses
   CategoryButtons, PaletteAPI,
   Windows, Messages, SysUtils, Classes, Contnrs, Graphics, Controls, Forms,
@@ -113,7 +126,22 @@ type
 function ComponentSelectorCtrl: TComponentSelector;
 procedure InitPlugin(Unload: Boolean);
 
+{$IFEND}
+
 implementation
+
+{$IF CompilerVersion < 18.0}
+
+function ComponentSelectorCtrl: TComponentSelector;
+begin
+  Result := nil;
+end;
+
+procedure InitPlugin(Unload: Boolean);
+begin
+end;
+
+{$ELSE}
 
 uses
   ComponentManager, IDEUtils, IDEHooks, Math, AppConsts, TypInfo,
@@ -691,5 +719,7 @@ begin
   if ListVisible then
     Windows.SetFocus(Panel.Handle);
 end;
+
+{$IFEND}
 
 end.

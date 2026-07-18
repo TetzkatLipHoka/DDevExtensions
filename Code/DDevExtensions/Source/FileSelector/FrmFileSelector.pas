@@ -25,6 +25,10 @@ uses
   ;
 
 type
+  {$IFNDEF UNICODE}
+  TWMNotifyLV = TWMNotify; // pre-2009 ComCtrls has no TWMNotifyLV
+  {$ENDIF}
+
   { Fix Clear() in OwnerData Mode. We don't need to get every item (OnData) if we delete them all. }
   TListView = class(ComCtrls.TListView)
   protected
@@ -215,6 +219,16 @@ var
 type
   TOpenEdit = class(TEdit);
 
+{$IFNDEF UNICODE} // pre-2009 compatibility
+const
+  FILE_ATTRIBUTE_DEVICE = $00000040;
+
+function CharInSet(C: AnsiChar; const CharSet: TSysCharSet): Boolean;
+begin
+  Result := C in CharSet;
+end;
+{$ENDIF UNICODE}
+
 { TListView }
 
 procedure TListView.CNNotify(var Message: TWMNotifyLV);
@@ -263,7 +277,10 @@ var
 begin
   for I := 1 to Length(S) do
     if (S[I] = '*') or (S[I] = '?') then
-      Exit(True);
+    begin
+      Result := True;
+      Exit;
+    end;
   Result := False;
 end;
 
@@ -531,10 +548,17 @@ begin
           if (FileName <> '') and not IsBinaryFile(FileName) then
           begin
             Module := (BorlandIDEServices as IOTAModuleServices).FindModule(FileName);
+            {$IF CompilerVersion >= 17.0} // 2005+ (D7's IOTAModule has no Show)
             if Module <> nil then
               Module.Show
             else
               ActionServices.OpenFile(FileName);
+            {$ELSE}
+            if (Module <> nil) and (Module.GetModuleFileEditor(0) <> nil) then
+              Module.GetModuleFileEditor(0).Show
+            else
+              ActionServices.OpenFile(FileName);
+            {$IFEND}
           end;
         end;
       end;
@@ -786,7 +810,9 @@ begin
   inherited;
 
   FormFileSelector := Self;
+  {$IF CompilerVersion >= 20.0} // 2009+ (no TToolBar.DrawingStyle before)
   ToolBar.DrawingStyle := ComCtrls.dsGradient;
+  {$IFEND}
   ListView.DoubleBuffered := True;
   ToolBar.Flat := True; // BDS 2006's default is True => Flat is not stored in the DFM
 
@@ -1064,15 +1090,17 @@ procedure TFormFileSelector.GetFilenames;
     Ext, UpName: string;
     Index: Integer;
     IsSource: Boolean;
-    {$IFNDEF COMPILER12_UP}
+    {$IF (CompilerVersion >= 17.0) and (CompilerVersion < 20.0)} // 2005-2007 (.NET personalities)
     PersStr: string;
-    {$ENDIF ~COMPILER12_UP}
+    {$IFEND}
   begin
     // "PrjFiles" is nil if "Files" points to the "SourceFiles".
 
+    {$IF CompilerVersion >= 20.0} // 2009+ (D7's Windows.pas declares FindFirstFileEx with a wrong result type)
     if CheckWin32Version(6, 1) then // we don't need the "AlternativeName", but want speed
       SearchHandle := FindFirstFileEx(PChar(Dir + PathDelim + '*.*'), FindExInfoBasic, @FindData, FindExSearchNameMatch, nil, FIND_FIRST_EX_LARGE_FETCH)
     else
+    {$IFEND}
       SearchHandle := FindFirstFile(PChar(Dir + PathDelim + '*.*'), FindData);
 
     if SearchHandle <> INVALID_HANDLE_VALUE then
@@ -1086,7 +1114,7 @@ procedure TFormFileSelector.GetFilenames;
           if IsSource or
             (not SourceOnly and (SameText(Ext, '.dcu') {$IFNDEF COMPILER12_UP}or SameText(Ext, '.dcuil'){$ENDIF})) then
           begin
-            {$IFNDEF COMPILER12_UP}
+            {$IF (CompilerVersion >= 17.0) and (CompilerVersion < 20.0)} // 2005-2007 (.NET personalities)
             if not IsSource and (Project <> nil) then
             begin
               PersStr := Project.Personality;
@@ -1096,7 +1124,7 @@ procedure TFormFileSelector.GetFilenames;
               if (PersStr = sDelphiDotNetPersonality) and SameText(Ext, '.dcu') then
                 Continue;
             end;
-            {$ENDIF ~COMPILER12_UP}
+            {$IFEND}
             UpName := AnsiUpperCase(ChangeFileExt(FileName, ''));
             { Only add files that aren't already found in a more prioritized
               directory. }
@@ -1345,7 +1373,11 @@ begin
         if Group <> nil then
           for I := 0 to Group.ProjectCount - 1 do
             if Group.Projects[I] <> Project then
+              {$IF CompilerVersion >= 17.0} // 2005+
               if Group.Projects[I].ProjectType = sPackage then
+              {$ELSE} // D7's IOTAProject has no ProjectType
+              if SameText(ExtractFileExt(Group.Projects[I].FileName), '.dpk') then
+              {$IFEND}
                 AddProjectSource(Group.Projects[I], nil, Sources, SourcesHash);
 
         CachedSources.Assign(Sources);

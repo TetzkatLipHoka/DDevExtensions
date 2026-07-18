@@ -13,12 +13,7 @@ library DDevExtensions;
 {$I ..\Source\DelphiExtension.inc}
 
 uses
-   madExcept,
-  madLinkDisAsm,
-  madListHardware,
-  madListProcesses,
-  madListModules,
- Windows,
+  Windows,
   SysUtils,
   Classes,
   Forms,
@@ -102,22 +97,11 @@ uses
   RemovePixelsPerInchProperty in '..\Source\FormDesignerHelpers\RemovePixelsPerInchProperty.pas',
   FixAlphaControlsPNG in '..\Source\FormDesignerHelpers\FixAlphaControlsPNG.pas';
 
-var
-  AboutBoxServices: IOTAAboutBoxServices = nil;
-  AboutBoxIndex: Integer = 0;
-
 procedure DoneWizard;
 begin
+  // Delphi 7 has no IOTAAboutBoxServices
   try
-    try
-      UninstallHooks;
-    finally
-      if AboutBoxServices <> nil then
-      begin
-        AboutBoxServices.RemovePluginInfo(AboutBoxIndex);
-        AboutBoxServices := nil;
-      end;
-    end;
+    UninstallHooks;
   except
     on E: Exception do
       MessageBox(0, PChar(E.Message), PChar('DDevExtensions - ' + string(E.ClassName)), MB_OK or MB_ICONERROR);
@@ -129,18 +113,6 @@ function InitWizard(const BorlandIDEServices: IBorlandIDEServices;
 begin
   Terminate := DoneWizard;
   Result := True;
-  if Supports(BorlandIDEServices, IOTAAboutBoxServices, AboutBoxServices) then
-  begin
-    AboutBoxIndex := AboutBoxServices.AddPluginInfo(
-      sPluginName,
-      sPluginName + sLineBreak +
-      sLineBreak +
-      sPluginCopyright + sLineBreak +
-      'Use at your own risk.',
-      0
-    );
-  end;
-
   InstallHooks;
 end;
 

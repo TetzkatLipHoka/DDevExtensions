@@ -101,7 +101,7 @@ begin
   chkReleaseCompilerUnitCache.Checked := FCompileProgress.ReleaseCompilerUnitCache;
   chkReleaseCompilerUnitCacheHigh.Checked := FCompileProgress.ReleaseCompilerUnitCacheHigh;
   chkReleaseCompilerUnitCacheHigh.Enabled := chkReleaseCompilerUnitCache.Checked;
-  {$ENDIF}
+  {$IFEND}
 
   {$IF CompilerVersion < 22.0} // XE has its own option
   cbxDisableRebuildDlg.Checked := FCompileProgress.DisableRebuildDlg;
@@ -121,7 +121,7 @@ begin
   {$IF CompilerVersion < 36}
   FCompileProgress.ReleaseCompilerUnitCache := chkReleaseCompilerUnitCache.Checked;
   FCompileProgress.ReleaseCompilerUnitCacheHigh := chkReleaseCompilerUnitCacheHigh.Checked;
-  {$ENDIF}
+  {$IFEND}
   {$IF CompilerVersion < 22.0} // XE has its own option
   FCompileProgress.DisableRebuildDlg := cbxDisableRebuildDlg.Checked;
   {$IFEND}

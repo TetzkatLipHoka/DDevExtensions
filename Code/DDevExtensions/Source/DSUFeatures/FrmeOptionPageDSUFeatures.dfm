@@ -2,13 +2,9 @@ inherited FrameOptionPageDSUFeatures: TFrameOptionPageDSUFeatures
   Width = 385
   Height = 366
   TabStop = True
-  ExplicitWidth = 385
-  ExplicitHeight = 366
   inherited pnlClient: TPanel
     Width = 385
     Height = 317
-    ExplicitWidth = 385
-    ExplicitHeight = 317
     object lblEditorTabDblClickAction: TLabel
       Left = 8
       Top = 216
@@ -39,6 +35,7 @@ inherited FrameOptionPageDSUFeatures: TFrameOptionPageDSUFeatures
       Width = 140
       Height = 21
       Style = csDropDownList
+      ItemHeight = 13
       TabOrder = 11
       Items.Strings = (
         'Disabled'
@@ -159,15 +156,12 @@ inherited FrameOptionPageDSUFeatures: TFrameOptionPageDSUFeatures
   end
   inherited pnlDescription: TPanel
     Width = 385
-    ExplicitWidth = 385
     inherited bvlSplitter: TBevel
       Width = 385
-      ExplicitWidth = 385
     end
     inherited lblDescription: TLabel
       Width = 157
       Caption = 'Configure extended IDE settings'
-      ExplicitWidth = 157
     end
   end
 end

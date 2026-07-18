@@ -135,8 +135,10 @@ procedure TStartParameterTeam.RemoveRunParams(Project: IOTAProject);
 var
   Ext, S: string;
   StartPos, EndPos, Len: Integer;
+  {$IF CompilerVersion >= 20.0} // 2009+
   BOM: TBytes;
   Encoding: TEncoding;
+  {$IFEND}
   Stream: TFileStream;
   Filename: string;
   Lines: TStrings;
@@ -151,7 +153,9 @@ begin
        bdsproj, dproj: <Parameters Name="RunParams">text</Parameters>
   }
 
+  {$IF CompilerVersion >= 20.0} // 2009+
   Encoding := nil;
+  {$IFEND}
   Modified := False;
   Lines := TStringList.Create;
   Stream := nil;
@@ -161,10 +165,12 @@ begin
     if ((Ext = '.dproj') or (Ext = '.cbproj')) and FileExists(Filename) then
     begin
       Stream := TFileStream.Create(Filename, fmOpenReadWrite or fmShareDenyRead);
+      {$IF CompilerVersion >= 20.0} // 2009+
       SetLength(BOM, 4);
       Stream.Read(BOM[0], 4);
       TEncoding.GetBufferEncoding(BOM, Encoding);
       Stream.Position := 0;
+      {$IFEND}
       Lines.LoadFromStream(Stream);
       for I := 0 to Lines.Count - 1 do
       begin
@@ -217,7 +223,7 @@ begin
     begin
       GetFileTime(Stream.Handle, nil, nil, @LastWriteTime);
       Stream.Position := 0;
-      Lines.SaveToStream(Stream, Encoding);
+      Lines.SaveToStream(Stream{$IF CompilerVersion >= 20.0}, Encoding{$IFEND});
       Stream.Size := Stream.Position;
       SetFileTime(Stream.Handle, nil, nil, @LastWriteTime);
     end;

@@ -2,6 +2,23 @@ unit StrucViewSearch;
 
 interface
 
+{$IF CompilerVersion < 21.0} // needs StructureViewAPI + Rtti-based VirtTreeHandler (2010+); no-op stub for older
+uses
+  Windows, SysUtils, Classes;
+
+type
+  TStructureViewSearch = class(TComponent)
+  public
+    procedure SetHotkey(AHotkey: TShortCut);
+  end;
+
+procedure InitPlugin(Unload: Boolean);
+
+var
+  StructureViewSearch: TStructureViewSearch;
+
+{$ELSE}
+
 uses
   Windows, SysUtils, Classes, Contnrs, Controls, Forms, StdCtrls, ExtCtrls, ImgList,
   Graphics, ActnList, Math,
@@ -48,8 +65,21 @@ procedure InitPlugin(Unload: Boolean);
 
 var
   StructureViewSearch: TStructureViewSearch;
+{$IFEND}
 
 implementation
+
+{$IF CompilerVersion < 21.0}
+
+procedure InitPlugin(Unload: Boolean);
+begin
+end;
+
+procedure TStructureViewSearch.SetHotkey(AHotkey: TShortCut);
+begin
+end;
+
+{$ELSE}
 
 uses
   IDEUtils, FrmeOptionPageDSUFeatures;
@@ -475,6 +505,8 @@ begin
   end;
   FEdit.ListBox.ItemIndex := MinLenDiffIndex;
 end;
+
+{$IFEND}
 
 end.
 

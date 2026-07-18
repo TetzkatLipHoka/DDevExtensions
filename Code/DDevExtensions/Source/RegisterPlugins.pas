@@ -125,10 +125,10 @@ begin
       RegisterLateLoader(StrucViewSearch.InitPlugin);
     {$ENDIF}
 
-    {$IF CompilerVersion < 21.0}
-    if DisabledPlugins.IndexOf('ProjectMgrShortCuts') = -1 then
-      RegisterLateLoader(ProjectMgrShortCuts.InitPlugin);
-    {$IFEND}
+//    {$IF CompilerVersion < 21.0} // MS not avail (unit commented out in uses above)
+//    if DisabledPlugins.IndexOf('ProjectMgrShortCuts') = -1 then
+//      RegisterLateLoader(ProjectMgrShortCuts.InitPlugin);
+//    {$IFEND}
 
     if DisabledPlugins.IndexOf('StartParameter') = -1 then
       RegisterExpertLoader(StartParameterManagerReg.InitPlugin);

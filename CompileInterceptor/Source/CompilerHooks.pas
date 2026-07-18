@@ -904,15 +904,14 @@ begin
     if PascalProc <> nil then
     begin
       if DelphiVer >= 10 then
-        PascalProc := Pointer(PByte(PascalProc) + 10)
+        PascalProc := Pointer(PAnsiChar(PascalProc) + 10)
       else
-        PascalProc := Pointer(PByte(PascalProc) + 1);
+        PascalProc := Pointer(PAnsiChar(PascalProc) + 1);
       PascalComInOut := PascalProc^;
       OrgPascalComInOut := PascalComInOut^;
 
       SetPascalComInOut;
     end;
-
   end
   else
   begin

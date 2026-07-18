@@ -23,6 +23,7 @@ type
     FCachedAutoClose: Boolean;
     FLastPercentage: Integer;
     FProgressBar: TProgressBar;
+    FAutoCloseCheckBox: TCheckBox;
     FTaskbarList: ITaskbarList;
     FTaskbarList3: ITaskbarList3;
     function GetCurrFile: string;
@@ -62,6 +63,7 @@ type
     function GetLongWord(const Name: string): LongWord;
 
     procedure DoAutoCloseClick(Sender: TObject);
+    procedure CreateAutoCloseCheckBox(Form: TCustomForm);
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
   public
     constructor Create; reintroduce;
@@ -92,7 +94,7 @@ var
 implementation
 
 uses
-  Themes, AppConsts, Hooking, IDEHooks;
+  Variants, ToolsAPI, Themes, AppConsts, Hooking, IDEHooks;
 
 const
   {$IF CompilerVersion >= 21.0} // Delphi 2010+
@@ -162,6 +164,8 @@ begin
       FProgressBar := nil;
       UpdateTaskbarProgress;
     end;
+    if AComponent = FAutoCloseCheckBox then
+      FAutoCloseCheckBox := nil;
   end;
 end;
 
@@ -469,6 +473,8 @@ begin
     Exit;
   end;
 
+  CreateAutoCloseCheckBox(Form);
+
   if FMaxFiles = 0 then
     NewPercentage := 0
   else
@@ -593,6 +599,45 @@ end;
 procedure TNativeProgressForm.DoAutoCloseClick(Sender: TObject);
 begin
   FCachedAutoClose := TCheckBox(Sender).Checked;
+  try
+    (BorlandIDEServices as IOTAServices).GetEnvironmentOptions.Values['AutoCloseProgressDlg'] := FCachedAutoClose;
+  except
+    // option not supported by this IDE version - checkbox stays cosmetic
+  end;
+end;
+
+procedure TNativeProgressForm.CreateAutoCloseCheckBox(Form: TCustomForm);
+var
+  Value: Variant;
+begin
+  { Injects an "Automatically close on successful compile" checkbox into the
+    IDE's compile progress dialog (bottom left, same row as the progress bar).
+    It toggles the IDE's AutoCloseProgressDlg environment option. }
+  if (FAutoCloseCheckBox <> nil) or (Form = nil) then
+    Exit;
+  try
+    Value := (BorlandIDEServices as IOTAServices).GetEnvironmentOptions.Values['AutoCloseProgressDlg'];
+    if VarIsNull(Value) or VarIsEmpty(Value) then
+      Exit;
+    FCachedAutoClose := Boolean(Value);
+  except
+    Exit; // option unknown to this IDE - do not offer the checkbox
+  end;
+
+  FAutoCloseCheckBox := TCheckBox.Create(Form);
+  FAutoCloseCheckBox.FreeNotification(Self);
+  FAutoCloseCheckBox.Name := 'DDevExtensions_AutoClose';
+  FAutoCloseCheckBox.Caption := sAutoCloseCaption;
+  {$IF CompilerVersion >= 33.0} // new progress dialog: place below the labels, left of our progress bar
+  FAutoCloseCheckBox.SetBounds(8, Form.ClientHeight - 27, Form.ClientWidth - 200, 17);
+  {$ELSE}
+  // same row as the progress bar (which sits at ClientHeight - 4 - 7 - 25, right-aligned)
+  FAutoCloseCheckBox.SetBounds(8, Form.ClientHeight - 4 - 17 - 25 {$IFDEF COMPILER10_UP}- 20{$ENDIF},
+    Form.ClientWidth - {$IFDEF IDE50_UP}120{$ELSE}80{$ENDIF} - 24, 17);
+  {$IFEND}
+  FAutoCloseCheckBox.Checked := FCachedAutoClose;
+  FAutoCloseCheckBox.OnClick := DoAutoCloseClick;
+  FAutoCloseCheckBox.Parent := Form;
 end;
 
 

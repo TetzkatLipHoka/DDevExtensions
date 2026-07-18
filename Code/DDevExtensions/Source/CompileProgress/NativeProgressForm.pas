@@ -473,7 +473,7 @@ begin
     Exit;
   end;
 
-  CreateAutoCloseCheckBox(Form);
+  // CreateAutoCloseCheckBox(Form); // disabled for testing: possibly collides with another expert's checkbox (user report)
 
   if FMaxFiles = 0 then
     NewPercentage := 0

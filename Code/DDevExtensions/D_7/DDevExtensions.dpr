@@ -13,6 +13,13 @@ library DDevExtensions;
 {$I ..\Source\DelphiExtension.inc}
 
 uses
+  {$IFDEF madExcept} // diagnostics build: dcc32 -DmadExcept + madExceptPatch (see scratchpad build_d7_diag.bat)
+  madExcept,
+  madLinkDisAsm,
+  madListHardware,
+  madListProcesses,
+  madListModules,
+  {$ENDIF}
   Windows,
   SysUtils,
   Classes,

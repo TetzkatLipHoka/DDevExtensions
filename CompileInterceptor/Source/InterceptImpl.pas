@@ -384,13 +384,13 @@ begin
   end;
 
   if Result then
-  begin  
+  begin
     {$IFDEF UNICODE}
     Filename := UTF8Encode(FilenameStr.Value);
-    Msg := UTF8Encode(FilenameStr.Value);
+    Msg := UTF8Encode(MsgStr.Value);
     {$ELSE}
     Filename := FilenameStr.Value;
-    Msg := FilenameStr.Value;
+    Msg := MsgStr.Value;
     {$ENDIF}
   end;
 end;

@@ -39,6 +39,7 @@ type
     FAskCompileFromDiffProjectTemporary: Boolean;
     {$IF CompilerVersion < 20.0} // pre-2009: no AutoCloseProgressDlg env option, we persist the setting
     FAutoCloseProgressDialog: Boolean;
+    procedure SetAutoCloseProgressDialog(const Value: Boolean);
     procedure AutoCloseFallbackChanged(Sender: TObject);
     {$IFEND}
     {$IF CompilerVersion < 23.0} // XE2+ changed how version info works
@@ -94,11 +95,16 @@ type
     property AskCompileFromDiffProject: Boolean read FAskCompileFromDiffProject write SetAskCompileFromDiffProject;
     property AskCompileFromDiffProjectTemporary: Boolean read FAskCompileFromDiffProjectTemporary write FAskCompileFromDiffProjectTemporary;
     {$IF CompilerVersion < 20.0}
-    property AutoCloseProgressDialog: Boolean read FAutoCloseProgressDialog write FAutoCloseProgressDialog;
+    property AutoCloseProgressDialog: Boolean read FAutoCloseProgressDialog write SetAutoCloseProgressDialog;
     {$IFEND}
   end;
 
 procedure InitPlugin(Unload: Boolean);
+
+{$IF CompilerVersion < 20.0}
+{ Gives the "Extended IDE Settings" option page access to the auto-close setting }
+function CompileProgressConfig: TCompileProgress;
+{$IFEND}
 
 implementation
 
@@ -178,13 +184,6 @@ begin
       FormNativeProgress.ShowProgressBar(False);
 
     FormNativeProgress.CurrFile := FormNativeProgress.CurrFile  + '     Time: ' + TimeStr(t);
-
-    {$IF CompilerVersion < 20.0}
-    // pre-2009 IDEs keep the compile dialog open until OK is clicked; close it
-    // ourselves after a successful compile if the auto-close checkbox is set
-    if FormNativeProgress.AutoCloseFallback and (FormNativeProgress.ErrorCount = 0) then
-      FormNativeProgress.PostAutoClose;
-    {$IFEND}
   end;
 end;
 
@@ -578,7 +577,7 @@ destructor TCompileProgress.Destroy;
 begin
   GetCompileInterceptorServices.UnregisterInterceptor(FCompileInterceptorId);
   FIDENotifier.Free;
-  FormNativeProgress.Free;
+  FreeAndNil(FormNativeProgress);
   FPasFiles.Free;
   inherited Destroy;
 end;
@@ -608,6 +607,18 @@ begin
 end;
 
 {$IF CompilerVersion < 20.0}
+function CompileProgressConfig: TCompileProgress;
+begin
+  Result := GlobalCompileProgress;
+end;
+
+procedure TCompileProgress.SetAutoCloseProgressDialog(const Value: Boolean);
+begin
+  FAutoCloseProgressDialog := Value;
+  if FormNativeProgress <> nil then
+    FormNativeProgress.AutoCloseFallback := Value; // sync the dialog checkbox
+end;
+
 procedure TCompileProgress.AutoCloseFallbackChanged(Sender: TObject);
 begin
   if FormNativeProgress.AutoCloseFallback <> FAutoCloseProgressDialog then

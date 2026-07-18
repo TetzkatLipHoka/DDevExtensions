@@ -135,6 +135,7 @@ type
     chkKillDExplore: TCheckBox;
     chkConfirmDlgOnDebugCtrlF1: TCheckBox;
     chkDisableAlphaSortClassCompletion: TCheckBox;
+    chkAutoCloseCompileDlg: TCheckBox;
   private
     { Private-Deklarationen }
     FDSUFeatures: TDSUFeaturesConfig;
@@ -156,7 +157,7 @@ implementation
 
 uses
   Main, DSUFeatures, StrUtils, IDEHooks, Hooking, IDEUtils, StrucViewSearch, ToolsAPIHelpers,
-  AppConsts, DisableAlphaSortClassCompletion;
+  AppConsts, DisableAlphaSortClassCompletion, CompileProgress;
 
 {$R *.dfm}
 
@@ -220,6 +221,15 @@ begin
   chkConfirmDlgOnDebugCtrlF1.Checked := FDSUFeatures.ConfirmDlgOnDebugCtrlF1;
   chkDisableAlphaSortClassCompletion.Checked := FDSUFeatures.DisableAlphaSortClassCompletion;
 
+  {$IF CompilerVersion < 20.0}
+  // mirror of the checkbox injected into the compile progress dialog - with
+  // auto-close active and a fast build there is no chance to uncheck it there
+  chkAutoCloseCompileDlg.Checked := (CompileProgressConfig <> nil) and
+    CompileProgressConfig.AutoCloseProgressDialog;
+  {$ELSE}
+  chkAutoCloseCompileDlg.Free; // 2009+: the IDE has its own AutoCloseProgressDlg option
+  {$IFEND}
+
   { Hide options whose IDE hooks do not exist in this IDE version }
   {$IF CompilerVersion < 20.0} // pre-2009
   chkDisableAlphaSortClassCompletion.Visible := False;
@@ -257,6 +267,14 @@ begin
   FDSUFeatures.ConfirmDlgOnDebugCtrlF1 := chkConfirmDlgOnDebugCtrlF1.Checked;
   FDSUFeatures.DisableAlphaSortClassCompletion := chkDisableAlphaSortClassCompletion.Checked;
   FDSUFeatures.Save;
+
+  {$IF CompilerVersion < 20.0}
+  if CompileProgressConfig <> nil then
+  begin
+    CompileProgressConfig.AutoCloseProgressDialog := chkAutoCloseCompileDlg.Checked;
+    CompileProgressConfig.Save;
+  end;
+  {$IFEND}
 end;
 
 procedure TFrameOptionPageDSUFeatures.Selected;

@@ -13,7 +13,7 @@ unit NativeProgressForm;
 interface
 
 uses
-  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, StdCtrls, ExtCtrls, ComCtrls, TaskbarIntf;
+  Windows, SysUtils, Classes, Graphics, Controls, Forms, StdCtrls, ExtCtrls, ComCtrls, TaskbarIntf;
 
 type
   TNativeProgressForm = class(TComponent)
@@ -25,6 +25,9 @@ type
     FProgressBar: TProgressBar;
     FAutoCloseCheckBox: TCheckBox;
     FAutoCloseFallback: Boolean;
+    {$IF CompilerVersion < 20.0}
+    FAutoCloseTimer: TTimer;
+    {$IFEND}
     FOnAutoCloseFallbackChanged: TNotifyEvent;
     FTaskbarList: ITaskbarList;
     FTaskbarList3: ITaskbarList3;
@@ -66,6 +69,9 @@ type
     function GetLongWord(const Name: string): LongWord;
 
     procedure DoAutoCloseClick(Sender: TObject);
+    {$IF CompilerVersion < 20.0}
+    procedure AutoCloseTimerTick(Sender: TObject);
+    {$IFEND}
     procedure CreateAutoCloseCheckBox(Form: TCustomForm);
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
   public
@@ -74,7 +80,6 @@ type
     procedure UpdateForm;
     procedure Cancel;
     procedure ShowProgressBar(AShow: Boolean);
-    procedure PostAutoClose;
 
     { Backing store for the auto-close checkbox on IDEs without the
       AutoCloseProgressDlg environment option (pre-2009). }
@@ -103,7 +108,7 @@ var
 implementation
 
 uses
-  Variants, ToolsAPI, Themes, AppConsts, Hooking, IDEHooks;
+  Variants, Menus, ToolsAPI, Themes, AppConsts, Hooking, IDEHooks;
 
 const
   {$IF CompilerVersion >= 21.0} // Delphi 2010+
@@ -619,23 +624,27 @@ begin
   {$IFEND}
 end;
 
-procedure TNativeProgressForm.PostAutoClose;
+{$IF CompilerVersion < 20.0}
+procedure TNativeProgressForm.AutoCloseTimerTick(Sender: TObject);
 var
   Form: TCustomForm;
   Btn: TButton;
 begin
-  { Posts a click on the dialog's OK/Cancel button so the caller's wait loop
-    (which keeps the dialog open after the compile) closes it. }
+  { Pre-2009 IDEs run the wait-for-OK loop inside TProgressForm.StartCompile,
+    so any code after the hooked call runs too late to close the dialog. This
+    timer fires from that loop's message pump instead: when the compile is
+    done the Cancel button turns into "OK" - click it if the compile
+    succeeded and auto-close is enabled. }
+  if not FCachedAutoClose then
+    Exit;
   Form := GetForm;
-  if (Form <> nil) and Form.HandleAllocated then
-  begin
-    Btn := TButton(Form.FindComponent('CancelButton'));
-    if (TComponent(Btn) is TButton) and Btn.HandleAllocated then
-      PostMessage(Btn.Handle, BM_CLICK, 0, 0)
-    else
-      PostMessage(Form.Handle, WM_CLOSE, 0, 0);
-  end;
+  if (Form = nil) or not Form.Visible then
+    Exit;
+  Btn := TButton(Form.FindComponent('CancelButton'));
+  if (TComponent(Btn) is TButton) and (StripHotkey(Btn.Caption) = 'OK') and (ErrorCount = 0) then
+    Btn.Click;
 end;
+{$IFEND}
 
 procedure TNativeProgressForm.DoAutoCloseClick(Sender: TObject);
 begin
@@ -687,13 +696,32 @@ begin
   {$IF CompilerVersion >= 33.0} // new progress dialog: place below the labels, left of our progress bar
   FAutoCloseCheckBox.SetBounds(8, Form.ClientHeight - 27, Form.ClientWidth - 200, 17);
   {$ELSE}
-  // same row as the progress bar (which sits at ClientHeight - 4 - 7 - 25, right-aligned)
-  FAutoCloseCheckBox.SetBounds(8, Form.ClientHeight - 4 - 17 - 25 {$IFDEF COMPILER10_UP}- 20{$ENDIF},
-    Form.ClientWidth - {$IFDEF IDE50_UP}120{$ELSE}80{$ENDIF} - 24, 17);
+  // half width + two lines so it does not overlap the OK button; bottom edge
+  // stays level with the progress bar row (bar sits right-aligned at
+  // ClientHeight - 4 - 7 - 25)
+  {$IF CompilerVersion >= 18.0}
+  FAutoCloseCheckBox.WordWrap := True;
+  {$IFEND}
+  FAutoCloseCheckBox.SetBounds(8, Form.ClientHeight - 4 - 34 - 25 {$IFDEF COMPILER10_UP}- 20{$ENDIF},
+    (Form.ClientWidth - {$IFDEF IDE50_UP}120{$ELSE}80{$ENDIF} - 24) div 2, 34);
   {$IFEND}
   FAutoCloseCheckBox.Checked := FCachedAutoClose;
   FAutoCloseCheckBox.OnClick := DoAutoCloseClick;
   FAutoCloseCheckBox.Parent := Form;
+  {$IF CompilerVersion < 18.0}
+  // D7's TCheckBox has no WordWrap property - apply the multiline style directly
+  SetWindowLong(FAutoCloseCheckBox.Handle, GWL_STYLE,
+    GetWindowLong(FAutoCloseCheckBox.Handle, GWL_STYLE) or BS_MULTILINE);
+  {$IFEND}
+
+  {$IF CompilerVersion < 20.0}
+  if FAutoCloseTimer = nil then
+  begin
+    FAutoCloseTimer := TTimer.Create(Self);
+    FAutoCloseTimer.Interval := 100;
+    FAutoCloseTimer.OnTimer := AutoCloseTimerTick;
+  end;
+  {$IFEND}
 end;
 
 

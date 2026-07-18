@@ -87,6 +87,11 @@ end;
 procedure TFrameOptionPageStartParameterTeam.LoadData;
 begin
   cbxActive.Checked := FStartParameterTeam.Active;
+  {$IF CompilerVersion < 17.0} // D7
+  lblDescription.Caption := 'The start parameters aren''t stored in the dof file';
+  {$ELSEIF CompilerVersion < 20.0} // 2005-2007
+  lblDescription.Caption := 'The start parameters aren''t stored in the bdsproj/dproj file';
+  {$IFEND}
 end;
 
 procedure TFrameOptionPageStartParameterTeam.SaveData;
@@ -145,10 +150,13 @@ var
   I: Integer;
   Modified: Boolean;
   LastWriteTime: TFileTime;
+  InParametersSection: Boolean;
 begin
   { Remove RunParams from project file }
 
   {
+     Delphi 5-7:
+       dof: [Parameters] RunParams=text
      Delphi 2005-2009:
        bdsproj, dproj: <Parameters Name="RunParams">text</Parameters>
   }
@@ -162,7 +170,35 @@ begin
   try
     Filename := Project.FileName;
     Ext := LowerCase(ExtractFileExt(Filename));
-    if ((Ext = '.dproj') or (Ext = '.cbproj')) and FileExists(Filename) then
+    {$IF CompilerVersion < 17.0} // D7: IOTAProject.FileName is the .dpr/.dpk; the options live in the .dof
+    if (Ext = '.dpr') or (Ext = '.dpk') then
+    begin
+      Filename := ChangeFileExt(Filename, '.dof');
+      Ext := '.dof';
+    end;
+    {$IFEND}
+    if (Ext = '.dof') and FileExists(Filename) then
+    begin
+      Stream := TFileStream.Create(Filename, fmOpenReadWrite or fmShareDenyRead);
+      Lines.LoadFromStream(Stream);
+      InParametersSection := False;
+      for I := 0 to Lines.Count - 1 do
+      begin
+        S := Lines[I];
+        if (S <> '') and (S[1] = '[') then
+          InParametersSection := SameText(S, '[Parameters]')
+        else if InParametersSection and SameText(Copy(S, 1, Length('RunParams=')), 'RunParams=') then
+        begin
+          if Length(S) > Length('RunParams=') then
+          begin
+            Lines[I] := 'RunParams=';
+            Modified := True;
+          end;
+          Break;
+        end;
+      end;
+    end
+    else if ((Ext = '.dproj') or (Ext = '.cbproj') or (Ext = '.bdsproj')) and FileExists(Filename) then
     begin
       Stream := TFileStream.Create(Filename, fmOpenReadWrite or fmShareDenyRead);
       {$IF CompilerVersion >= 20.0} // 2009+

@@ -65,7 +65,8 @@ end;
 procedure TFrameOptionPageCompilerProgress.chkReleaseCompilerUnitCacheClick(Sender: TObject);
 begin
   inherited;
-  chkReleaseCompilerUnitCacheHigh.Enabled := chkReleaseCompilerUnitCache.Checked;
+  chkReleaseCompilerUnitCacheHigh.Enabled := chkReleaseCompilerUnitCache.Enabled and
+    chkReleaseCompilerUnitCache.Checked;
 end;
 
 constructor TFrameOptionPageCompilerProgress.Create(AOwner: TComponent);
@@ -89,10 +90,10 @@ begin
   edtLastCompileVersionInfoFormat.Visible := False;
   {$IFEND}
   {$IF CompilerVersion < 20.0} // pre-2009: the hooks behind these options are 2009+/2010-only
-  chkReleaseCompilerUnitCache.Visible := False;
-  chkReleaseCompilerUnitCacheHigh.Visible := False;
-  cbxDisableRebuildDlg.Visible := False;
-  chkAskBeforeCompilingFileFromDiffernetProject.Visible := False;
+  chkReleaseCompilerUnitCache.Enabled := False;
+  chkReleaseCompilerUnitCacheHigh.Enabled := False;
+  cbxDisableRebuildDlg.Enabled := False;
+  chkAskBeforeCompilingFileFromDiffernetProject.Enabled := False;
   {$IFEND}
 end;
 
@@ -106,7 +107,8 @@ begin
   {$ELSE}
   chkReleaseCompilerUnitCache.Checked := FCompileProgress.ReleaseCompilerUnitCache;
   chkReleaseCompilerUnitCacheHigh.Checked := FCompileProgress.ReleaseCompilerUnitCacheHigh;
-  chkReleaseCompilerUnitCacheHigh.Enabled := chkReleaseCompilerUnitCache.Checked;
+  chkReleaseCompilerUnitCacheHigh.Enabled := chkReleaseCompilerUnitCache.Enabled and
+    chkReleaseCompilerUnitCache.Checked;
   {$IFEND}
 
   {$IF CompilerVersion < 22.0} // XE has its own option

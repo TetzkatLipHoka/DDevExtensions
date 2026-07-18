@@ -155,7 +155,7 @@ inherited FrameOptionPageDSUFeatures: TFrameOptionPageDSUFeatures
     end
     object chkAutoCloseCompileDlg: TCheckBox
       Left = 8
-      Top = 31
+      Top = 299
       Width = 360
       Height = 17
       Caption = 'Auto-close compile progress dialog on successful compile'

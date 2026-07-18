@@ -631,17 +631,23 @@ var
   Btn: TButton;
 begin
   { Pre-2009 IDEs run the wait-for-OK loop inside TProgressForm.StartCompile,
-    so any code after the hooked call runs too late to close the dialog. This
-    timer fires from that loop's message pump instead: when the compile is
-    done the Cancel button turns into "OK" - click it if the compile
-    succeeded and auto-close is enabled. }
-  if not FCachedAutoClose then
-    Exit;
+    so any code after the hooked call runs too late to touch the dialog. This
+    timer fires from that loop's message pump instead: the compile is done
+    once the Cancel button has turned into "OK". }
   Form := GetForm;
   if (Form = nil) or not Form.Visible then
     Exit;
   Btn := TButton(Form.FindComponent('CancelButton'));
-  if (TComponent(Btn) is TButton) and (StripHotkey(Btn.Caption) = 'OK') and (ErrorCount = 0) then
+  if not (TComponent(Btn) is TButton) or (StripHotkey(Btn.Caption) <> 'OK') then
+    Exit; // still compiling
+  if ErrorCount <> 0 then
+    Exit;
+  // upstream bug: if there was nothing to (re)compile the progress bar sticks
+  // at 0% while the dialog waits for OK - snap it to 100% (via the property
+  // so FLastPercentage stays consistent for the next compile)
+  if FProjectFilesCompiled < FMaxFiles then
+    ProjectFilesCompiled := FMaxFiles;
+  if FCachedAutoClose then
     Btn.Click;
 end;
 {$IFEND}
@@ -666,6 +672,10 @@ procedure TNativeProgressForm.CreateAutoCloseCheckBox(Form: TCustomForm);
 {$IF CompilerVersion >= 20.0}
 var
   Value: Variant;
+{$IFEND}
+{$IF CompilerVersion < 33.0}
+var
+  Btn: TButton;
 {$IFEND}
 begin
   { Injects an "Automatically close on successful compile" checkbox into the
@@ -696,14 +706,18 @@ begin
   {$IF CompilerVersion >= 33.0} // new progress dialog: place below the labels, left of our progress bar
   FAutoCloseCheckBox.SetBounds(8, Form.ClientHeight - 27, Form.ClientWidth - 200, 17);
   {$ELSE}
-  // half width + two lines so it does not overlap the OK button; bottom edge
-  // stays level with the progress bar row (bar sits right-aligned at
-  // ClientHeight - 4 - 7 - 25)
+  // half width + two lines so it does not overlap the OK button, vertically
+  // centered on the button row
   {$IF CompilerVersion >= 18.0}
   FAutoCloseCheckBox.WordWrap := True;
   {$IFEND}
-  FAutoCloseCheckBox.SetBounds(8, Form.ClientHeight - 4 - 34 - 25 {$IFDEF COMPILER10_UP}- 20{$ENDIF},
-    (Form.ClientWidth - {$IFDEF IDE50_UP}120{$ELSE}80{$ENDIF} - 24) div 2, 34);
+  Btn := TButton(Form.FindComponent('CancelButton'));
+  if TComponent(Btn) is TButton then
+    FAutoCloseCheckBox.SetBounds(8, Btn.Top + (Btn.Height - 34) div 2,
+      (Form.ClientWidth - {$IFDEF IDE50_UP}120{$ELSE}80{$ENDIF} - 24) div 2, 34)
+  else
+    FAutoCloseCheckBox.SetBounds(8, Form.ClientHeight - 4 - 34 - 25 {$IFDEF COMPILER10_UP}- 20{$ENDIF},
+      (Form.ClientWidth - {$IFDEF IDE50_UP}120{$ELSE}80{$ENDIF} - 24) div 2, 34);
   {$IFEND}
   FAutoCloseCheckBox.Checked := FCachedAutoClose;
   FAutoCloseCheckBox.OnClick := DoAutoCloseClick;

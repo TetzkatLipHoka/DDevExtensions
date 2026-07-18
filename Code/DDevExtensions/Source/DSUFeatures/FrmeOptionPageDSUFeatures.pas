@@ -230,18 +230,19 @@ begin
   chkAutoCloseCompileDlg.Free; // 2009+: the IDE has its own AutoCloseProgressDlg option
   {$IFEND}
 
-  { Hide options whose IDE hooks do not exist in this IDE version }
+  { Disable options whose IDE hooks do not exist in this IDE version
+    (disabled instead of hidden - the gaps looked odd) }
   {$IF CompilerVersion < 20.0} // pre-2009
-  chkDisableAlphaSortClassCompletion.Visible := False;
-  chkDontBreakOnSpawnedProcesses.Visible := False;
-  chkShowAllFrames.Visible := False;
-  chkReplaceOpenFileAtCursor.Visible := False;
-  chkDisableCodeFolding.Visible := False; // code folding itself is 2005+, the hook 2009-only
+  chkDisableAlphaSortClassCompletion.Enabled := False;
+  chkDontBreakOnSpawnedProcesses.Enabled := False;
+  chkShowAllFrames.Enabled := False;
+  chkReplaceOpenFileAtCursor.Enabled := False;
+  chkDisableCodeFolding.Enabled := False; // code folding itself is 2005+, the hook 2009-only
   {$IFEND}
   {$IF CompilerVersion < 21.0} // pre-2010: Rtti-based VirtTreeHandler/StructureViewAPI stubs
-  chkShowFileProjectInPrjMgr.Visible := False;
-  HotKeyStructureViewSearch.Visible := False;
-  LabelStructureViewSearchHotkey.Visible := False;
+  chkShowFileProjectInPrjMgr.Enabled := False;
+  HotKeyStructureViewSearch.Enabled := False;
+  LabelStructureViewSearchHotkey.Enabled := False;
   {$IFEND}
 end;
 

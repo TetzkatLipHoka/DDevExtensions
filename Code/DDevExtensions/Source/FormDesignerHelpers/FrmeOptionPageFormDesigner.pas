@@ -22,7 +22,7 @@ type
   private
     FActive: Boolean;
     FLabelMargin: Boolean;
-    FRemoveExplicitProperty: Boolean;    
+    FRemoveExplicitProperty: Boolean;
     FRemovePixelsPerInchProperty: Boolean;
     FRemoveTextHeightProperty: Boolean;
     FFixAlphaControlsPNG: Boolean;
@@ -53,6 +53,7 @@ type
     cbxLabelMargin: TCheckBox;
     chkRemoveExplicitProperties: TCheckBox;
     chkRemovePixelsPerInchProperties: TCheckBox;
+    chkRemovePixelsPerInchProperty: TCheckBox;
     chkRemoveTextHeightProperty: TCheckBox;
     chkFixAlphaControlsPNG: TCheckBox;
     procedure cbxActiveClick(Sender: TObject);

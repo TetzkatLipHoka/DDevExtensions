@@ -42,6 +42,8 @@ const
   sBuildLaterItem = 'buildLater_Item';
 
 type
+  TControlAccess = class(TControl); // TControl.PopupMenu is protected
+
   { Subclasses the Project Manager tree's WindowProc to catch Ctrl+Up/Down. }
   TTreeKeyHook = class(TObject)
   private
@@ -76,44 +78,54 @@ begin
   Result := nil;
 end;
 
-{ The build-order items are added to the tree's local menu on demand; they may
-  be owned by the form or live only inside a popup menu, so search both. }
-function FindBuildItem(Form: TCustomForm; const AName: string): TMenuItem;
+{ The build-order items are created lazily when the tree's local menu pops up
+  (PopupMenu.OnPopup = TProjectManagerForm.LocalMenuPopup), so they do not exist
+  until then. Fire OnPopup to build the menu for the current selection, then
+  look the item up inside that menu. }
+function FindBuildItemViaPopup(Menu: TPopupMenu; const AName: string): TMenuItem;
+begin
+  Result := nil;
+  if Menu = nil then
+    Exit;
+  if Assigned(Menu.OnPopup) then
+    Menu.OnPopup(Menu);
+  Result := FindMenuItemInItems(Menu.Items, AName);
+end;
+
+function TriggerBuildOrder(Form: TCustomForm; Tree: TWinControl; Sooner: Boolean): Boolean;
 var
+  ItemName: string;
+  Item: TMenuItem;
   I: Integer;
   C: TComponent;
 begin
-  C := Form.FindComponent(AName);
-  if C is TMenuItem then
-  begin
-    Result := TMenuItem(C);
-    Exit;
-  end;
-  for I := 0 to Form.ComponentCount - 1 do
-  begin
-    C := Form.Components[I];
-    if C is TPopupMenu then
-      Result := FindMenuItemInItems(TPopupMenu(C).Items, AName)
-    else if C is TMainMenu then
-      Result := FindMenuItemInItems(TMainMenu(C).Items, AName)
-    else
-      Result := nil;
-    if Result <> nil then
-      Exit;
-  end;
-  Result := nil;
-end;
-
-procedure TriggerBuildOrder(Form: TCustomForm; Sooner: Boolean);
-var
-  Item: TMenuItem;
-begin
+  Result := False;
   if Sooner then
-    Item := FindBuildItem(Form, sBuildSoonerItem)
+    ItemName := sBuildSoonerItem
   else
-    Item := FindBuildItem(Form, sBuildLaterItem);
+    ItemName := sBuildLaterItem;
+
+  { primary: the tree's own local menu }
+  Item := FindBuildItemViaPopup(TControlAccess(Tree).PopupMenu, ItemName);
+
+  { fallback: fire every popup menu on the form, then any already-built item }
+  if Item = nil then
+    for I := 0 to Form.ComponentCount - 1 do
+    begin
+      C := Form.Components[I];
+      if C is TPopupMenu then
+      begin
+        Item := FindBuildItemViaPopup(TPopupMenu(C), ItemName);
+        if Item <> nil then
+          Break;
+      end;
+    end;
+
   if (Item <> nil) and Item.Enabled and Item.Visible then
+  begin
     Item.Click;
+    Result := True;
+  end;
 end;
 
 { TTreeKeyHook }
@@ -141,9 +153,13 @@ begin
      (GetKeyState(VK_CONTROL) < 0) and
      (GetKeyState(VK_SHIFT) >= 0) and (GetKeyState(VK_MENU) >= 0) then
   begin
-    TriggerBuildOrder(FForm, Message.WParam = VK_UP); // Up = build sooner
-    Message.Result := 0;
-    Exit; // swallow so the tree does not just move the selection
+    // Up = build sooner. Only swallow the key if we actually acted, so plain
+    // tree behavior is preserved when the command is unavailable.
+    if TriggerBuildOrder(FForm, FTree, Message.WParam = VK_UP) then
+    begin
+      Message.Result := 0;
+      Exit;
+    end;
   end;
   FOrgWndProc(Message);
 end;

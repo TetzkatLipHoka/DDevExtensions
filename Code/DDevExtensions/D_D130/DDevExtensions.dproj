@@ -318,4 +318,8 @@ $(PreBuildEvent)]]></PreBuildEvent>
         <PostBuildEvent/>
         <PostBuildEventIgnoreExitCode>False</PostBuildEventIgnoreExitCode>
     </PropertyGroup>
+    <PropertyGroup Condition="'$(Platform)'=='Win64'">
+        <PreBuildEvent>copy /Y &quot;$(PROJECTDIR)\..\..\..\CompileInterceptor\Bin\$(Platform)\CompileInterceptorW64.dll&quot; &quot;$(OUTPUTDIR)&quot;</PreBuildEvent>
+        <PreBuildEventIgnoreExitCode>False</PreBuildEventIgnoreExitCode>
+    </PropertyGroup>
 </Project>

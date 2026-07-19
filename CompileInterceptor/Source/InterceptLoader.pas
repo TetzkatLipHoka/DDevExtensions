@@ -24,7 +24,13 @@ implementation
 const
   // Pre-2009 (ANSI) IDEs must use the ANSI-built CompileInterceptor.dll (native PChar
   // filenames in the interceptor interface); 2009+ uses the Unicode CompileInterceptorW.dll.
+  // The Win64 IDE loads CompileInterceptorW64.dll so that the 32/64-bit DLLs can ship
+  // in the same directory.
+  {$IFDEF CPUX64}
+  CompileInterceptorDllName = 'CompileInterceptorW64.dll';
+  {$ELSE}
   CompileInterceptorDllName = {$IFDEF UNICODE}'CompileInterceptorW.dll'{$ELSE}'CompileInterceptor.dll'{$ENDIF};
+  {$ENDIF}
 
 var
   _GetCompileInterceptorServices: function: ICompileInterceptorServices; stdcall;

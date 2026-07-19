@@ -322,6 +322,7 @@ end;}
 {-------------------------------------------------------------------------------------------------}
 
 {$IFDEF CPUX64}
+{$IFDEF ALPHASORT_X64_WIP}
 // ---------------------------------------------------------------------------
 //  Delphi 13 x64 implementation. The x86 path scans Complete for byte patterns
 //  and ReplaceRelCallOffset-patches the iterator ctor / GetSymbol / SetSorted
@@ -357,6 +358,7 @@ var
   AlphaOrgGetSym: Pointer;       // real designide GetSymbol
   AlphaCompleteLo, AlphaCompleteHi: NativeUInt;
   AlphaMethodAddPosHooked: Boolean;
+  AlphaCtorN, AlphaGetN: Integer;   // DIAG: instrumentation counters
 
 procedure AlphaLog(const S: string);
 var
@@ -377,15 +379,50 @@ begin
   end;
 end;
 
+function AlphaShortName(Sym: Pointer): string;   // read FShortIdent (ShortString @ +0x10)
+var
+  b: PByte;
+  n, i: Integer;
+begin
+  Result := '';
+  if Sym = nil then Exit;
+  try
+    b := PByte(Sym) + $10;
+    n := b^;
+    if n > 63 then n := 63;
+    for i := 1 to n do
+      Result := Result + Char(b[i]);
+  except
+    Result := '?';
+  end;
+end;
+
 // A ctor call from inside Complete gets our reordering iterator; every other
 // caller in the IDE gets the untouched designide iterator.
 function AlphaCtorGate(AClass: Pointer; AllocFlag: NativeInt; ATable: Pointer): Pointer;
 var
   ra: NativeUInt;
+  it: TTableIterator;
+  i: Integer;
+  s: string;
 begin
   ra := NativeUInt(ReturnAddress);
   if (ra >= AlphaCompleteLo) and (ra < AlphaCompleteHi) then
-    Result := MethodSymbolTableIteratorFactory(TClass(AClass), Integer(AllocFlag), TSymbolTable(ATable))
+  begin
+    it := MethodSymbolTableIteratorFactory(TClass(AClass), Integer(AllocFlag), TSymbolTable(ATable));
+    Result := it;
+    Inc(AlphaCtorN);
+    if AlphaCtorN <= 4 then
+    try
+      s := '';
+      for i := 0 to it.Count - 1 do
+        s := s + AlphaShortName(it.GetSymbol(i)) + ',';
+      AlphaLog(Format('DIAG ctor#%d substituted ra=%p count=%d order=[%s]',
+        [AlphaCtorN, Pointer(ra), it.Count, s]));
+    except
+      AlphaLog('DIAG ctor log exception');
+    end;
+  end
   else
     Result := TIteratorCtorProc(AlphaOrgCtor)(AClass, AllocFlag, ATable);
 end;
@@ -396,7 +433,12 @@ var
 begin
   ra := NativeUInt(ReturnAddress);
   if (ra >= AlphaCompleteLo) and (ra < AlphaCompleteHi) then
-    Result := TTableIterator(Instance).GetSymbol(Index)
+  begin
+    Result := TTableIterator(Instance).GetSymbol(Index);
+    Inc(AlphaGetN);
+    if AlphaGetN <= 40 then
+      AlphaLog(Format('DIAG getsym ra=%p idx=%d -> %s', [Pointer(ra), Index, AlphaShortName(Result)]));
+  end
   else
     Result := TIteratorGetSymProc(AlphaOrgGetSym)(Instance, Index);
 end;
@@ -494,6 +536,8 @@ begin
     end;
     AlphaCompleteLo := NativeUInt(CompleteP);
     AlphaCompleteHi := AlphaCompleteLo + $1200;
+    AlphaCtorN := 0;   // DIAG
+    AlphaGetN := 0;    // DIAG
 
     AlphaCtorIatSlot := AlphaFindIatSlot(CompleteP, AlphaOrgCtor);
     AlphaGetSymIatSlot := AlphaFindIatSlot(CompleteP, AlphaOrgGetSym);
@@ -556,6 +600,7 @@ begin
     AlphaLog('uninstall: restored');
   end;
 end;
+{$ENDIF ALPHASORT_X64_WIP}
 {$ENDIF CPUX64}
 
 procedure InstallDisableAlphaSortClassCompletion(Value: Boolean);
@@ -669,8 +714,20 @@ begin
 end;
 {$ELSE}
 begin
+  {$IFDEF ALPHASORT_X64_WIP}
   // Win64 (Delphi 13): IAT-gated reorder + MethodAddPos redirect (see CPUX64 block above).
   InstallAlphaSortX64(Value);
+  {$ELSE}
+  // Win64: DISABLED pending deeper RE. The reorder iterator was confirmed working (it feeds
+  // TPascalClassCompleter.Complete the methods in declaration order), but on D13 that is NOT the
+  // lever that orders the generated implementation stubs - the completer re-sorts its "to add"
+  // list alphabetically afterwards (the x86 feature also no-ops a TSortedThingList.SetSorted call;
+  // the x64 equivalent has not been located yet), so output stayed alphabetical. The hooks also
+  // destabilised the editor (Home on a blank line raised an exception - likely the IDE-wide
+  // MethodAddPos redirect and/or the ReturnAddress window overshooting Complete into GetClasses).
+  // Full implementation + confirmed x64 offsets are preserved under {$DEFINE ALPHASORT_X64_WIP}
+  // above and in git (65463f8); notes in scratchpad alphasort_x64_offsets.md.
+  {$ENDIF}
 end;
 {$ENDIF ~CPUX64}
 

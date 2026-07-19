@@ -10,15 +10,17 @@ unit DisableAlphaSortClassCompletion;
 
 {$I ..\DelphiExtension.inc}
 
-{$IF Defined(CPUX64) and (CompilerVersion >= 37.0)}
-  // D13.1 x64 ONLY. The x64 path (IAT-gated reorder + SetSorted no-op) was
-  // reverse-engineered against delphicoreide370 via a byte-pattern scan of
-  // TPascalClassCompleter.Complete; other x64 IDE versions (e.g. D12/coreide290)
-  // have a different Complete layout, so keep it D13-only until RE'd per version.
-  // The install is all-or-nothing and would just no-op elsewhere, but not even
-  // trying avoids any risk of a coincidental mis-match on an un-RE'd layout.
+{$IFDEF CPUX64}
+  // x64 IAT-gated reorder + SetSorted no-op. Reverse-engineered against
+  // delphicoreide370 (D13.1), but no longer version-locked: the install is
+  // all-or-nothing with a UNIQUE-match requirement on the fragile SetSorted
+  // site, and the runtime gate self-validates the live object layout on the
+  // first real completion (AlphaValidateIterator) and self-disables on any IDE
+  // build whose Complete/layout does not match - so it can be attempted on any
+  // x64 IDE (e.g. D12/coreide290, a future D14) and safely turns itself off
+  // where it does not fit, instead of needing a per-version compile guard.
   {$DEFINE ALPHASORT_X64_WIP}
-{$IFEND}
+{$ENDIF}
 
 interface
 
@@ -385,7 +387,15 @@ var
   AlphaOrgGetSym: Pointer;       // real designide GetSymbol
   AlphaCompleteLo, AlphaCompleteHi: NativeUInt;
   AlphaMethodAddPosHooked: Boolean;
-  AlphaCtorN, AlphaGetN: Integer;   // DIAG: instrumentation counters
+  // Runtime self-validation. Install strengthens the structural checks; the
+  // gate validates the LIVE object layout on the first real completion before
+  // trusting our reorder. AlphaProbation = layout not yet confirmed on this
+  // IDE; AlphaDisabled = confirmed wrong (our offsets don't match) -> every
+  // gate falls through to the untouched designide iterator (feature off, no
+  // corruption). This is what lets the hook be attempted on ANY x64 IDE and
+  // self-disable on a version it wasn't reverse-engineered for.
+  AlphaProbation: Boolean;
+  AlphaDisabled: Boolean;
   AlphaSetSortedCallP: PByte;                  // E8 call site of TSortedThingList.SetSorted(True) in Complete
   AlphaSetSortedOrgBytes: array[0..4] of Byte; // original call bytes for uninstall
   AlphaSetSortedPatched: Boolean;
@@ -409,70 +419,6 @@ begin
   end;
 end;
 
-function AlphaShortName(Sym: Pointer): string;   // read FShortIdent (ShortString @ +0x10)
-var
-  b: PByte;
-  n, i: Integer;
-begin
-  Result := '';
-  if Sym = nil then Exit;
-  try
-    b := PByte(Sym) + $10;
-    n := b^;
-    if n > 63 then n := 63;
-    for i := 1 to n do
-      Result := Result + Char(b[i]);
-  except
-    Result := '?';
-  end;
-end;
-
-// A ctor call from inside Complete gets our reordering iterator; every other
-// caller in the IDE gets the untouched designide iterator.
-function AlphaCtorGate(AClass: Pointer; AllocFlag: NativeInt; ATable: Pointer): Pointer;
-var
-  ra: NativeUInt;
-  it: TTableIterator;
-  i: Integer;
-  s: string;
-begin
-  ra := NativeUInt(ReturnAddress);
-  if (ra >= AlphaCompleteLo) and (ra < AlphaCompleteHi) then
-  begin
-    it := MethodSymbolTableIteratorFactory(TClass(AClass), Integer(AllocFlag), TSymbolTable(ATable));
-    Result := it;
-    Inc(AlphaCtorN);
-    if AlphaCtorN <= 4 then
-    try
-      s := '';
-      for i := 0 to it.Count - 1 do
-        s := s + AlphaShortName(it.GetSymbol(i)) + ',';
-      AlphaLog(Format('DIAG ctor#%d substituted ra=%p count=%d order=[%s]',
-        [AlphaCtorN, Pointer(ra), it.Count, s]));
-    except
-      AlphaLog('DIAG ctor log exception');
-    end;
-  end
-  else
-    Result := TIteratorCtorProc(AlphaOrgCtor)(AClass, AllocFlag, ATable);
-end;
-
-function AlphaGetSymGate(Instance: Pointer; Index: Integer): Pointer;
-var
-  ra: NativeUInt;
-begin
-  ra := NativeUInt(ReturnAddress);
-  if (ra >= AlphaCompleteLo) and (ra < AlphaCompleteHi) then
-  begin
-    Result := TTableIterator(Instance).GetSymbol(Index);
-    Inc(AlphaGetN);
-    if AlphaGetN <= 40 then
-      AlphaLog(Format('DIAG getsym ra=%p idx=%d -> %s', [Pointer(ra), Index, AlphaShortName(Result)]));
-  end
-  else
-    Result := TIteratorGetSymProc(AlphaOrgGetSym)(Instance, Index);
-end;
-
 function AlphaReadable(P: Pointer; Len: NativeUInt): Boolean;
 var
   mbi: TMemoryBasicInformation;
@@ -483,6 +429,128 @@ begin
   if mbi.State <> MEM_COMMIT then Exit;
   if (mbi.Protect and (PAGE_NOACCESS or PAGE_GUARD)) <> 0 then Exit;
   Result := NativeUInt(P) + Len <= NativeUInt(mbi.BaseAddress) + NativeUInt(mbi.RegionSize);
+end;
+
+// Committed AND executable - used at install time to sanity-check that the
+// SetSorted call site's E8 target is real code (a coincidental byte match's
+// rel32 would point at garbage).
+function AlphaExecReadable(P: Pointer): Boolean;
+const
+  EXEC = PAGE_EXECUTE or PAGE_EXECUTE_READ or PAGE_EXECUTE_READWRITE or PAGE_EXECUTE_WRITECOPY;
+var
+  mbi: TMemoryBasicInformation;
+begin
+  Result := False;
+  if (P = nil) or (NativeUInt(P) < $10000) then Exit;
+  if VirtualQuery(P, mbi, SizeOf(mbi)) = 0 then Exit;
+  if mbi.State <> MEM_COMMIT then Exit;
+  Result := (mbi.Protect and EXEC) <> 0;
+end;
+
+// Runtime layout self-validation. Wrong object offsets make the symbol pointers
+// our iterator collected (via the Next/FSymbolList chain) or their fields come
+// out as garbage. We verify that BEFORE the completer generates from a reordered
+// list. Encoding-agnostic: check that a real object's pointers (VMT, signature)
+// land in committed memory and HeaderPos is bounded - not identifier text, so a
+// Unicode method name never trips it.
+function AlphaValidateIterator(it: TTableIterator): Boolean;
+var
+  i, n: Integer;
+  sym, sig: Pointer;
+  hp: Integer;
+begin
+  Result := False;
+  try
+    if (it.Count < 0) or (it.Count > 4096) then Exit;
+    n := it.Count;
+    if n > 8 then n := 8;
+    for i := 0 to n - 1 do
+    begin
+      sym := it.GetSymbol(i);
+      if not AlphaReadable(sym, $120) then Exit;             // symbol incl. FMethodSignature slot
+      if not AlphaReadable(PPointer(sym)^, SizeOf(Pointer)) then Exit; // VMT into a module
+      sig := PPointer(PByte(sym) + $118)^;                   // TMethodSymbol.FMethodSignature
+      if sig <> nil then
+      begin
+        if not AlphaReadable(sig, $20) then Exit;
+        if not AlphaReadable(PPointer(sig)^, SizeOf(Pointer)) then Exit; // signature VMT
+        hp := PInteger(PByte(sig) + $1C)^;                   // HeaderPos
+        if (hp < 0) or (hp > $0FFFFFFF) then Exit;
+      end;
+    end;
+    Result := True;
+  except
+    Result := False;
+  end;
+end;
+
+// A ctor call from inside Complete gets our reordering iterator; every other
+// caller in the IDE - and every call once the feature self-disabled - gets the
+// untouched designide iterator.
+function AlphaCtorGate(AClass: Pointer; AllocFlag: NativeInt; ATable: Pointer): Pointer;
+var
+  ra: NativeUInt;
+  rawCount: Integer;
+  it: TTableIterator;
+begin
+  ra := NativeUInt(ReturnAddress);
+  if AlphaDisabled or (ra < AlphaCompleteLo) or (ra >= AlphaCompleteHi) then
+  begin
+    Result := TIteratorCtorProc(AlphaOrgCtor)(AClass, AllocFlag, ATable);
+    Exit;
+  end;
+
+  // Guard the raw FCount before building our iterator: LoadSymbols does
+  // SetLength(FSymbols, Count), so a garbage Count from a wrong offset would
+  // attempt a huge allocation. Bail to the real ctor if it is implausible.
+  if (ATable = nil) or not AlphaReadable(ATable, $10) then
+  begin
+    Result := TIteratorCtorProc(AlphaOrgCtor)(AClass, AllocFlag, ATable);
+    Exit;
+  end;
+  rawCount := PInteger(PByte(ATable) + $08)^;            // TSymbolTable.FCount
+  if (rawCount < 0) or (rawCount > 4096) then
+  begin
+    AlphaLog(Format('verify: raw table count %d implausible -> disabling', [rawCount]));
+    AlphaDisabled := True;
+    Result := TIteratorCtorProc(AlphaOrgCtor)(AClass, AllocFlag, ATable);
+    Exit;
+  end;
+
+  it := MethodSymbolTableIteratorFactory(TClass(AClass), Integer(AllocFlag), TSymbolTable(ATable));
+
+  if AlphaProbation then
+  begin
+    if AlphaValidateIterator(it) then
+    begin
+      AlphaProbation := False;
+      AlphaLog(Format('verify: layout OK (count=%d) - feature active', [it.Count]));
+    end
+    else
+    begin
+      // Our offsets do not match this IDE build - do NOT hand the completer a
+      // reordered (possibly garbage) list. Discard our iterator, run this
+      // completion with the real one, and disable all further gating.
+      AlphaLog('verify: layout MISMATCH - disabling (feature off on this IDE)');
+      AlphaDisabled := True;
+      it.Free;
+      Result := TIteratorCtorProc(AlphaOrgCtor)(AClass, AllocFlag, ATable);
+      Exit;
+    end;
+  end;
+
+  Result := it;
+end;
+
+function AlphaGetSymGate(Instance: Pointer; Index: Integer): Pointer;
+var
+  ra: NativeUInt;
+begin
+  ra := NativeUInt(ReturnAddress);
+  if AlphaDisabled or (ra < AlphaCompleteLo) or (ra >= AlphaCompleteHi) then
+    Result := TIteratorGetSymProc(AlphaOrgGetSym)(Instance, Index)
+  else
+    Result := TTableIterator(Instance).GetSymbol(Index);
 end;
 
 // Complete's symbol range also covers exception funclets and GetClasses'
@@ -525,11 +593,14 @@ end;
 //   xor eax,eax        33 C0
 //   mov rcx,[rbp+D]    48 8B 8D dd dd dd dd   (same D)
 //   mov ebx,[rcx+10]   8B 59 10               (list count -> generation loop)
-function AlphaFindSetSortedCall(CompleteP, LimitP: PByte): PByte;
+// The match must be UNIQUE in Complete: a coincidental hit elsewhere makes
+// Count <> 1, and the caller then refuses to patch rather than NOP a wrong call.
+function AlphaFindSetSortedCall(CompleteP, LimitP: PByte; out Count: Integer): PByte;
 var
   p: PByte;
 begin
   Result := nil;
+  Count := 0;
   p := CompleteP;
   while NativeUInt(p) + 26 <= NativeUInt(LimitP) do
   begin
@@ -540,11 +611,12 @@ begin
        (p[23] = $8B) and (p[24] = $59) and (p[25] = $10) and
        (PInteger(p + 3)^ = PInteger(p + 19)^) then
     begin
-      Result := p + 9;
-      Exit;
+      if Count = 0 then Result := p + 9;
+      Inc(Count);
     end;
     Inc(p);
   end;
+  if Count <> 1 then Result := nil;
 end;
 
 // Locate the delphicoreide IAT slot that Complete uses to reach a designide
@@ -601,6 +673,8 @@ const
 var
   hCore, hDsgn: THandle;
   CompleteP, CompleteEndP: PByte;
+  ssCount, i: Integer;
+  readback: array[0..4] of Byte;
 begin
   if Value then
   begin
@@ -638,17 +712,26 @@ begin
 
     // All-or-nothing: without the SetSorted no-op the completer re-sorts the
     // "to add" list and the output stays alphabetical, so don't install at all.
-    AlphaSetSortedCallP := AlphaFindSetSortedCall(CompleteP, CompleteEndP);
+    // Require a UNIQUE match (a coincidental hit would be ambiguous -> unsafe).
+    AlphaSetSortedCallP := AlphaFindSetSortedCall(CompleteP, CompleteEndP, ssCount);
     if AlphaSetSortedCallP = nil then
     begin
-      AlphaLog('install: SetSorted call site not found');
+      AlphaLog(Format('install: SetSorted call site not uniquely found (matches=%d)', [ssCount]));
+      Exit;
+    end;
+    // The E8 at the site must point at real code; a coincidental byte match's
+    // rel32 would not.
+    if not AlphaExecReadable(GetCallTargetAddress(AlphaSetSortedCallP)) then
+    begin
+      AlphaLog('install: SetSorted call target not executable - aborting');
+      AlphaSetSortedCallP := nil;
       Exit;
     end;
 
     AlphaCompleteLo := NativeUInt(CompleteP);
     AlphaCompleteHi := NativeUInt(CompleteEndP);
-    AlphaCtorN := 0;   // DIAG
-    AlphaGetN := 0;    // DIAG
+    AlphaProbation := True;    // layout confirmed on the first real completion
+    AlphaDisabled := False;
 
     AlphaCtorIatSlot := AlphaFindIatSlot(CompleteP, CompleteEndP, AlphaOrgCtor);
     AlphaGetSymIatSlot := AlphaFindIatSlot(CompleteP, CompleteEndP, AlphaOrgGetSym);
@@ -696,6 +779,23 @@ begin
     end;
     AlphaSetSortedPatched := True;
     FlushInstructionCache(GetCurrentProcess, AlphaSetSortedCallP, SizeOf(NopCall));
+
+    // Readback: confirm the NOP actually landed (defends against a silently
+    // failed write to protected code). Roll everything back if it did not.
+    Move(AlphaSetSortedCallP^, readback, SizeOf(readback));
+    for i := 0 to High(readback) do
+      if readback[i] <> $90 then
+      begin
+        InjectCode(AlphaSetSortedCallP, @AlphaSetSortedOrgBytes[0], SizeOf(AlphaSetSortedOrgBytes));
+        AlphaPatchSlot(AlphaCtorIatSlot, AlphaOrgCtor);
+        AlphaPatchSlot(AlphaGetSymIatSlot, AlphaOrgGetSym);
+        AlphaLog('install: SetSorted NOP readback mismatch - rolled back');
+        AlphaSetSortedPatched := False;
+        AlphaCtorIatSlot := nil;
+        AlphaGetSymIatSlot := nil;
+        AlphaSetSortedCallP := nil;
+        Exit;
+      end;
 
     // Insertion-position redirect (same as x86): make MethodAddPos behave as if
     // the new method name were empty. RedirectOrgCall handles the x64 trampoline.

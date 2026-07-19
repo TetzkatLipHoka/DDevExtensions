@@ -184,6 +184,7 @@ begin
     // behind every competing foreign one, there is nothing to do.
     MinProper := -1;
     MaxForeign := -1;
+    MovedNames := ''; // pre-move indexes of the proper entries, for the log
     for i := 0 to List.Count - 1 do
     begin
       GC := List[i]^.GraphicClass;
@@ -193,6 +194,9 @@ begin
       begin
         if MinProper < 0 then
           MinProper := i;
+        if MovedNames <> '' then
+          MovedNames := MovedNames + ', ';
+        MovedNames := MovedNames + '[' + IntToStr(i) + '] ' + GC.ClassName;
       end
       else if (GC.ClassName = SPNGGraphicClassName) or
               SameText(List[i]^.Extension, 'png') then
@@ -230,16 +234,12 @@ begin
       // TPngImage ends up last (wins FindExt('png')), the TPNGGraphic
       // converter right before it (wins FindClassName('TPNGGraphic'))
       MovedCount := 0;
-      MovedNames := '';
       i := 0;
       while i < List.Count - MovedCount do
       begin
         GC := List[i]^.GraphicClass;
         if (GC <> nil) and IsProperPNGClass(GC) then
         begin
-          if MovedNames <> '' then
-            MovedNames := MovedNames + ', ';
-          MovedNames := MovedNames + '[' + IntToStr(i) + '] ' + GC.ClassName;
           List.Move(i, List.Count - 1);
           Inc(MovedCount);
         end

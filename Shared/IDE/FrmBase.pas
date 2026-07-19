@@ -230,6 +230,7 @@ end;
 procedure TFormBase.ThemeFixupControls(AParent: TWinControl);
 var
   ThemingServices: IOTAIDEThemingServices250;
+  Style: TCustomStyleServices;
 
   procedure Walk(Parent: TWinControl);
   var
@@ -239,17 +240,21 @@ var
     for I := 0 to Parent.ControlCount - 1 do
     begin
       C := Parent.Controls[I];
-      // 10.4..12: the IDE's ApplyTheme takes the native hotkey control out of
-      // the styling (fully native black-on-white, not even the background is
-      // styled). Put it back under the style engine - the VCL registers a
-      // TEditStyleHook for TCustomHotKey, and the hooked control also honors
-      // the style's text color (Delphi 13 themes it this way by itself; there
-      // this fixup is a no-op).
+      {$IF CompilerVersion < 37.0}
+      // 10.4..12: the IDE's ApplyTheme skips the native hotkey control
+      // entirely - no style, no colors, it stays black-on-white. Recolor it
+      // manually with the style's window colors and take client+font out of
+      // the style elements so the control's own colors reach it via
+      // WM_CTLCOLOREDIT. The native control honors both colors - Delphi 13
+      // proves that: there the IDE themes the hotkey itself (so D13 skips
+      // this block and keeps its confirmed-good rendering).
       if C is TCustomHotKey then
       begin
-        C.StyleName := '';
-        C.StyleElements := [seFont, seClient, seBorder];
+        TControlAccess(C).Color := Style.GetSystemColor(clWindow);
+        TControlAccess(C).Font.Color := Style.GetSystemColor(clWindowText);
+        C.StyleElements := C.StyleElements - [seClient, seFont];
       end;
+      {$IFEND}
       if C is TWinControl then
         Walk(TWinControl(C));
     end;
@@ -263,6 +268,9 @@ begin
   if Supports(BorlandIDEServices, IOTAIDEThemingServices250, ThemingServices) and
      ThemingServices.IDEThemingEnabled then
   begin
+    Style := ThemingServices.StyleServices;
+    if Style = nil then
+      Exit;
     ThemingServices.ApplyTheme(AParent);
     Walk(AParent);
   end;

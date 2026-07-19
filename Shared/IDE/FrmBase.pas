@@ -37,7 +37,7 @@ type
     constructor Create(AOwner: TComponent); override;
     procedure FormCreate(Sender: TObject);
     procedure ApplyIDETheme;
-    {$IF (CompilerVersion >= 32.0) and (CompilerVersion < 34.0)}
+    {$IF CompilerVersion >= 32.0}
     { Public: FrmTreePages must run this over option page frames that are
       created after the dialog's ApplyIDETheme }
     procedure ThemeFixupControls(AParent: TWinControl);
@@ -51,8 +51,10 @@ var
 implementation
 
 uses
-  {$IF (CompilerVersion >= 32.0) and (CompilerVersion < 34.0)}
+  {$IF CompilerVersion >= 32.0}
   ToolsAPI, // IDE theming services (10.2.2+)
+  {$IFEND}
+  {$IF (CompilerVersion >= 32.0) and (CompilerVersion < 34.0)}
   UxTheme,
   {$IFEND}
   HtHint;
@@ -166,6 +168,7 @@ end;
 procedure TFormBase.ApplyIDETheme;
 {$IF CompilerVersion >= 34.0} // 10.4+: TControl.StyleName does not exist earlier (10 Seattle: E2003)
 var
+  ThemingServices: IOTAIDEThemingServices250;
   sName: string;
 {$ELSE}
   {$IF CompilerVersion >= 32.0} // 10.2.2 Tokyo/10.3 Rio: no per-control styles yet
@@ -174,11 +177,24 @@ var
   {$IFEND}
 {$IFEND}
 begin
-  {$IF CompilerVersion >= 34.0} // 10.4+: adopt the IDE's style for this dialog
-  for sName in TStyleManager.StyleNames do
+  {$IF CompilerVersion >= 34.0}
+  // 10.4+: let the IDE's theming engine apply its active style to the dialog.
+  // Do NOT rely on looking the style up by name: the 'Win10IDE_*' style names
+  // used up to Delphi 11 are gone in Delphi 12/13, which left the dialogs
+  // unthemed (bright dialog on a dark IDE).
+  if Supports(BorlandIDEServices, IOTAIDEThemingServices250, ThemingServices) and
+     ThemingServices.IDEThemingEnabled then
   begin
-    if sName.StartsWith('Win10IDE_') then
-      self.StyleName := sName;
+    ThemingServices.RegisterFormClass(TCustomFormClass(ClassType));
+    ThemingServices.ApplyTheme(Self);
+  end;
+  if StyleName = '' then
+  begin
+    // fallback if the theming services are unavailable: adopt the IDE-look
+    // style by its 10.4/11 name (no-op when nothing matches)
+    for sName in TStyleManager.StyleNames do
+      if sName.StartsWith('Win10IDE_') then
+        Self.StyleName := sName;
   end;
   {$ELSE}
   {$IF CompilerVersion >= 32.0}
@@ -209,6 +225,20 @@ begin
   {$IFEND}
   {$IFEND}
 end;
+
+{$IF CompilerVersion >= 34.0}
+procedure TFormBase.ThemeFixupControls(AParent: TWinControl);
+var
+  ThemingServices: IOTAIDEThemingServices250;
+begin
+  // 10.4+: option page frames are created after the dialog's ApplyIDETheme
+  // ran; apply the IDE style to the late-created control tree as well (the
+  // style engine handles the control colors itself, so no manual fixups)
+  if Supports(BorlandIDEServices, IOTAIDEThemingServices250, ThemingServices) and
+     ThemingServices.IDEThemingEnabled then
+    ThemingServices.ApplyTheme(AParent);
+end;
+{$IFEND}
 
 {$IF (CompilerVersion >= 32.0) and (CompilerVersion < 34.0)}
 type

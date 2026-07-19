@@ -353,7 +353,7 @@ begin
         end;
         if Assigned(Intf) then
           Intf.LoadData;
-        {$IF (CompilerVersion >= 32.0) and (CompilerVersion < 34.0)}
+        {$IF CompilerVersion >= 32.0}
         // page frames are created after the dialog's ApplyIDETheme ran
         if Comp is TWinControl then
           ThemeFixupControls(TWinControl(Comp));

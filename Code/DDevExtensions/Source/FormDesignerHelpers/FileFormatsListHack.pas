@@ -3,9 +3,15 @@
 
   uTLH: FileFormatsList
   Last updated: 05/24/2025
+
+  DDevExtensions note: renamed from uTLH.FileFormatsList to FileFormatsListHack
+  (Delphi 7 does not accept dotted unit names). Gives access to the VCL's
+  private global TFileFormatsList (TPicture's registered graphic formats) by
+  disassembling the call to the internal GetFileFormats function that both
+  TPicture.RegisterFileFormat and RegisterFileFormatRes start with.
 }
 
-unit uTLH.FileFormatsList;
+unit FileFormatsListHack;
 
 interface
 
@@ -282,7 +288,9 @@ procedure FindGetFileFormatsFunc(out ProcAddr: TGetFileFormats);
     {$IF Defined(WIN32)}
       Result := FindFirstRelativeCallOpcode(PNativeUInt(PLongJump^.Destination)^)
     {$ELSEIF Defined(Win64)}
-      Result := FindFirstRelativeCallOpcode(PNativeUInt(PLongJump^.Destination + StartOffset + SizeOf(PLongJump^))^)
+      // RIP-relative displacement is SIGNED; Cardinal would zero-extend a
+      // negative disp32 and compute a wrong IAT address
+      Result := FindFirstRelativeCallOpcode(PNativeUInt(NativeUInt(Int64(StartOffset) + Integer(PLongJump^.Destination) + SizeOf(PLongJump^)))^)
     {$ELSE}
       {$MESSAGE Fatal 'Architecture not supported'}
     {$IFEND}
@@ -314,6 +322,12 @@ end;
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 initialization
-  FindGetFileFormatsFunc( GetFileFormats );
+  try
+    FindGetFileFormatsFunc( GetFileFormats );
+  except
+    // an unexpected code layout must never break loading the IDE plugin;
+    // callers check GetFileFormats = nil
+    GetFileFormats := nil;
+  end;
 
 end.

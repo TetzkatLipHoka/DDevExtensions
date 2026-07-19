@@ -978,6 +978,8 @@ $(PreBuildEvent)]]></PreBuildEvent>
         <DCCReference Include="..\Source\RegisterPlugins.pas"/>
         <DCCReference Include="..\Source\FormDesignerHelpers\RemovePixelsPerInchProperty.pas"/>
         <DCCReference Include="..\Source\FormDesignerHelpers\FixAlphaControlsPNG.pas"/>
+        <DCCReference Include="..\Source\FormDesignerHelpers\FileFormatsListHack.pas"/>
+        <DCCReference Include="..\Source\FormDesignerHelpers\PreferProperPNG.pas"/>
         <DCCReference Include="..\Source\FormDesignerHelpers\LabelMarginHelper.pas"/>
         <DCCReference Include="..\Source\FormDesignerHelpers\FrmeOptionPageFormDesigner.pas">
             <Form>FrameOptionPageFormDesigner</Form>

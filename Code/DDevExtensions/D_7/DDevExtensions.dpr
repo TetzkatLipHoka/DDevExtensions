@@ -105,6 +105,8 @@ uses
   RemoveTextHeightProperty in '..\Source\FormDesignerHelpers\RemoveTextHeightProperty.pas',
   RemovePixelsPerInchProperty in '..\Source\FormDesignerHelpers\RemovePixelsPerInchProperty.pas',
   FixAlphaControlsPNG in '..\Source\FormDesignerHelpers\FixAlphaControlsPNG.pas',
+  FileFormatsListHack in '..\Source\FormDesignerHelpers\FileFormatsListHack.pas',
+  PreferProperPNG in '..\Source\FormDesignerHelpers\PreferProperPNG.pas',
   FrmeOptionPageCompilerEnhancements in '..\Source\CompilerEnhancements\FrmeOptionPageCompilerEnhancements.pas' {FrameOptionPageCompilerEnhancements: TFrame};
 
 procedure DoneWizard;

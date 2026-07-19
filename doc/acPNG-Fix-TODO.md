@@ -1,8 +1,20 @@
 # acPNG / AlphaControls PNG registration fix — separate WIP
 
-Status: **not implemented / disabled in the build.** Enable with `{$DEFINE INCLUDE_ACPNGFIX}`
-in `Code/DDevExtensions/Source/DelphiExtension.inc` (D2009+ only). Until then the old
-`FixAlphaControlsPNG` unit compiles to an empty unit and is not wired in.
+Status (2026-07-19): the **registration-order arbiter is implemented** as its own feature
+"Prefer proper PNG over AlphaControls" (`Source/FormDesignerHelpers/PreferProperPNG.pas`,
+checkbox on the Form Designer options page, default off, all Delphi versions). It moves the
+proper `TPNGGraphic` (unit `pngimage`; D2009+ also DDev's `FixAlphaControlsPNG` class when
+compiled in) to the END of the VCL's global `TFileFormatsList`, because `FindClassName`/
+`FindExt` iterate `Count-1 downto 0` — the LAST registered class wins. It runs on feature
+activation and on every `ofnPackageInstalled`/`ofnPackageUninstalled`, and logs a dump of
+the list plus the action taken to `%APPDATA%\DDevExtensions\PNGArbiter.log` (pre-move state
+is logged before mutating). The list is reached via
+`Source/FormDesignerHelpers/FileFormatsListHack.pas` (renamed from `uTLH.FileFormatsList`
+— D7 rejects dotted unit names).
+
+The old `FixAlphaControlsPNG` DFM-converter remains **disabled**: enable with
+`{$DEFINE INCLUDE_ACPNGFIX}` in `Code/DDevExtensions/Source/DelphiExtension.inc`
+(D2009+ only). Until then it compiles to an empty unit and its checkbox is disabled.
 
 ## Background / the problem
 - **Delphi 7 has no native `pngimage`.** AlphaControls silently ships its own **acPNG** to
@@ -26,15 +38,17 @@ AlphaControls' acPNG with native `pngimage`:
 
 Effectively: ensure `pngimage` wins the format lookup over AlphaControls' acPNG.
 
-## Where the old attempt lives
+## Where the pieces live
+- `Code/DDevExtensions/Source/FormDesignerHelpers/PreferProperPNG.pas`
+  — the implemented arbiter (see status above).
 - `Code/DDevExtensions/Source/FormDesignerHelpers/FixAlphaControlsPNG.pas`
-  — the old approach: subclasses `TPngImage`/`TBitmap` as `TPNGGraphic` and calls
+  — the old converter approach: subclasses `TPngImage`/`TBitmap` as `TPNGGraphic` and calls
   `TPicture.RegisterFileFormat('', 'Portable network graphics (AlphaControls)', TPNGGraphic)`.
-  This is the incomplete WIP to be replaced by the list-reconciliation helper above.
-- `Code/DDevExtensions/Source/FormDesignerHelpers/__Check for Alpha installed, uTLH.FileFormatsList/uTLH.FileFormatsList.pas`
+  Still gated behind `INCLUDE_ACPNGFIX`; the arbiter promotes this class when it is compiled in.
+- `Code/DDevExtensions/Source/FormDesignerHelpers/FileFormatsListHack.pas`
   — `TFileFormatsListHack` (a `TList`-based view of VCL's private `TFileFormatsList`) to
-  add/remove/reorder registered formats by class name / extension / description. This is the
-  building block for manipulating the registration list. Currently referenced nowhere.
+  add/remove/reorder registered formats by class name / extension / description; renamed from
+  `uTLH.FileFormatsList.pas` (TetzkatLipHoka) because Delphi 7 rejects dotted unit names.
 
 ## Notes
 - This is a **D2009+ concern** (where native `pngimage` exists alongside acPNG). On D7 there is

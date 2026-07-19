@@ -1,9 +1,9 @@
 inherited FrameOptionPageFormDesigner: TFrameOptionPageFormDesigner
   Width = 372
-  Height = 189
+  Height = 210
   inherited pnlClient: TPanel
     Width = 372
-    Height = 140
+    Height = 161
     object cbxActive: TCheckBox
       Left = 8
       Top = 8
@@ -52,6 +52,14 @@ inherited FrameOptionPageFormDesigner: TFrameOptionPageFormDesigner
       Height = 17
       Caption = 'Replace TPNGGraphic (acPNG) with TPngImage'
       TabOrder = 5
+    end
+    object chkPreferProperPNG: TCheckBox
+      Left = 24
+      Top = 135
+      Width = 337
+      Height = 17
+      Caption = 'Prefer proper PNG over AlphaControls (registration order)'
+      TabOrder = 6
     end
   end
   inherited pnlDescription: TPanel

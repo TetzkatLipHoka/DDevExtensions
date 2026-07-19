@@ -276,9 +276,16 @@ var
         TControlAccess(C).Color := Style.GetSystemColor(clWindow);
         TControlAccess(C).Font.Color := Style.GetSystemColor(clWindowText);
       end
-      // belt and braces for labels the engine's ApplyTheme leaves black
+      // belt and braces for labels the engine's ApplyTheme leaves black;
+      // link labels (hand cursor, e.g. the homepage URL) get the style's
+      // hyperlink blue instead of plain window text
       else if (C is TCustomLabel) or (C is TCustomStaticText) then
-        TControlAccess(C).Font.Color := Style.GetSystemColor(clWindowText);
+      begin
+        if C.Cursor = crHandPoint then
+          TControlAccess(C).Font.Color := Style.GetSystemColor(clHotLight)
+        else
+          TControlAccess(C).Font.Color := Style.GetSystemColor(clWindowText);
+      end;
       if C is TCustomTreeView then
       begin
         // classic selection (the Explorer theme paints its own selection

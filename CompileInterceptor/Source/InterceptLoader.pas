@@ -57,8 +57,8 @@ begin
   _GetCompileInterceptorServices := nil;
   if CompilerInterceptorLib <> 0 then
   begin
-    CompilerInterceptorLib := 0;
     FreeLibrary(CompilerInterceptorLib);
+    CompilerInterceptorLib := 0;
   end;
 end;
 

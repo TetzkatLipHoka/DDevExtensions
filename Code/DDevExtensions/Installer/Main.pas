@@ -408,6 +408,7 @@ begin
   InstallFile(InstallDir, Format('DDevExtensions%s.dll', [EnvData.Version]));
   InstallFile(InstallDir, Format('DDevExtensions%s.map', [EnvData.Version]), False);
   InstallFile(InstallDir, 'CompileInterceptorW.dll', False);
+  InstallFile(InstallDir, 'CompileInterceptorW64.dll', False); // loaded by the Win64 IDE
   RegisterExpert(EnvData, 'DDevExtensions', InstallDir + PathDelim + Format('DDevExtensions%s.dll', [EnvData.Version]));
 end;
 
@@ -421,6 +422,7 @@ begin
     UninstallFile(InstallDir, Format('DDevExtensions%s.dll', [EnvData.Version]));
     UninstallFile(InstallDir, Format('DDevExtensions%s.map', [EnvData.Version]));
     UninstallFile(InstallDir, 'CompileInterceptorW.dll');
+    UninstallFile(InstallDir, 'CompileInterceptorW64.dll');
     UnregisterExpert(EnvData, 'DDevExtensions');
 
     RemoveDir(InstallDir); // try to delete the directory

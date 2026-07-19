@@ -13,17 +13,21 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms,
-  Dialogs
+  Dialogs, StdCtrls, ComCtrls
   {$IF CompilerVersion > 30}
   ,Vcl.Themes
   ,Vcl.Styles
-  {$IFEND} 
+  {$IFEND}
   ;
 
 type
   TFormBase = class(TForm)
   private
     { Private-Deklarationen }
+    {$IF (CompilerVersion >= 32.0) and (CompilerVersion < 34.0)}
+    procedure ThemeTreeCustomDrawItem(Sender: TCustomTreeView; Node: TTreeNode;
+      State: TCustomDrawState; var DefaultDraw: Boolean);
+    {$IFEND}
   protected
     procedure DoClose(var Action: TCloseAction); override;
     procedure DoShow; override;
@@ -32,6 +36,11 @@ type
     constructor Create(AOwner: TComponent); override;
     procedure FormCreate(Sender: TObject);
     procedure ApplyIDETheme;
+    {$IF (CompilerVersion >= 32.0) and (CompilerVersion < 34.0)}
+    { Public: FrmTreePages must run this over option page frames that are
+      created after the dialog's ApplyIDETheme }
+    procedure ThemeFixupControls(AParent: TWinControl);
+    {$IFEND}
     function ShowModal: Integer; override;
   end;
 
@@ -178,6 +187,7 @@ begin
   begin
     ThemingServices.RegisterFormClass(TCustomFormClass(ClassType));
     ThemingServices.ApplyTheme(Self);
+    ThemeFixupControls(Self);
   end;
   {$IFDEF THEMEDEBUG}
   // temporary diagnostics: DDevExtensions_ThemeDebug.log in %TEMP%
@@ -198,6 +208,69 @@ begin
   {$IFEND}
   {$IFEND}
 end;
+
+{$IF (CompilerVersion >= 32.0) and (CompilerVersion < 34.0)}
+type
+  TTreeViewAccess = class(TCustomTreeView);
+
+function GetIDEStyle(out Style: TCustomStyleServices): Boolean;
+var
+  ThemingServices: IOTAIDEThemingServices;
+begin
+  Style := nil;
+  Result := Supports(BorlandIDEServices, IOTAIDEThemingServices, ThemingServices) and
+    ThemingServices.IDEThemingEnabled;
+  if Result then
+  begin
+    Style := ThemingServices.StyleServices;
+    Result := Style <> nil;
+  end;
+end;
+
+procedure TFormBase.ThemeTreeCustomDrawItem(Sender: TCustomTreeView; Node: TTreeNode;
+  State: TCustomDrawState; var DefaultDraw: Boolean);
+var
+  Style: TCustomStyleServices;
+begin
+  // the 10.2/10.3 engine draws the selected tree item's text in black
+  if (cdsSelected in State) and GetIDEStyle(Style) then
+    Sender.Canvas.Font.Color := Style.GetSystemColor(clHighlightText);
+  DefaultDraw := True;
+end;
+
+procedure TFormBase.ThemeFixupControls(AParent: TWinControl);
+var
+  Style: TCustomStyleServices;
+
+  procedure Walk(Parent: TWinControl);
+  var
+    I: Integer;
+    C: TControl;
+  begin
+    for I := 0 to Parent.ControlCount - 1 do
+    begin
+      C := Parent.Controls[I];
+      // ApplyTheme leaves controls that default to clWindow (and do not
+      // inherit ParentColor) with a light client area
+      if (C is TCustomEdit) or (C is TCustomComboBox) or (C is TCustomListBox) or
+         (C is TCustomListView) or (C is TCustomTreeView) then
+      begin
+        TControlAccess(C).Color := Style.GetSystemColor(clWindow);
+        TControlAccess(C).Font.Color := Style.GetSystemColor(clWindowText);
+      end;
+      if C is TCustomTreeView then
+        if not Assigned(TTreeViewAccess(C).OnCustomDrawItem) then
+          TTreeViewAccess(C).OnCustomDrawItem := ThemeTreeCustomDrawItem;
+      if C is TWinControl then
+        Walk(TWinControl(C));
+    end;
+  end;
+
+begin
+  if GetIDEStyle(Style) then
+    Walk(AParent);
+end;
+{$IFEND}
 
 function TFormBase.ShowModal: Integer;
 var

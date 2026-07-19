@@ -806,6 +806,10 @@ begin
 end;
 
 procedure TFormFileSelector.FormCreate(Sender: TObject);
+{$IF (CompilerVersion >= 32.0) and (CompilerVersion < 34.0)} // 10.2.2/10.3: no TControl.StyleName yet
+var
+  ThemingServices: IOTAIDEThemingServices;
+{$IFEND}
 begin
   inherited;
 
@@ -827,6 +831,12 @@ begin
   
   {$IF CompilerVersion >= 34.0} // 10.4+: TControl.StyleName does not exist earlier
   FStyleDark := StyleName.Contains('Dark');
+  {$ELSE}
+  {$IF CompilerVersion >= 32.0} // 10.2.2/10.3: ask the IDE for its active theme instead
+  if Supports(BorlandIDEServices, IOTAIDEThemingServices, ThemingServices) and
+     ThemingServices.IDEThemingEnabled then
+    FStyleDark := ThemingServices.ActiveTheme.Contains('Dark');
+  {$IFEND}
   {$IFEND}
 end;
 

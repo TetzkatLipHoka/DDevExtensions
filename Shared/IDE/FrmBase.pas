@@ -40,6 +40,9 @@ var
 implementation
 
 uses
+  {$IF (CompilerVersion >= 32.0) and (CompilerVersion < 34.0)}
+  ToolsAPI, // IDE theming services (10.2.2+)
+  {$IFEND}
   HtHint;
 
 {$R *.dfm}
@@ -141,14 +144,30 @@ procedure TFormBase.FormCreate(Sender: TObject);
 {$IF CompilerVersion >= 34.0} // 10.4+: TControl.StyleName does not exist earlier (10 Seattle: E2003)
 var
   sName: string;
+{$ELSE}
+  {$IF CompilerVersion >= 32.0} // 10.2.2 Tokyo/10.3 Rio: no per-control styles yet
+var
+  ThemingServices: IOTAIDEThemingServices250;
+  {$IFEND}
 {$IFEND}
 begin
-  {$IF CompilerVersion >= 34.0} // 10.4+: TControl.StyleName does not exist earlier
+  {$IF CompilerVersion >= 34.0} // 10.4+: adopt the IDE's style for this dialog
   for sName in TStyleManager.StyleNames do
   begin
     if sName.StartsWith('Win10IDE_') then
       self.StyleName := sName;
   end;
+  {$ELSE}
+  {$IF CompilerVersion >= 32.0}
+  // 10.2.2/10.3 have no per-control styles; register the form class with the
+  // IDE's theming engine and let it restyle the whole dialog
+  if Supports(BorlandIDEServices, IOTAIDEThemingServices250, ThemingServices) and
+     ThemingServices.IDEThemingEnabled then
+  begin
+    ThemingServices.RegisterFormClass(TCustomFormClass(ClassType));
+    ThemingServices.ApplyTheme(Self);
+  end;
+  {$IFEND}
   {$IFEND}
 end;
 

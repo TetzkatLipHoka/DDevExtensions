@@ -855,6 +855,7 @@ var
   EditBuffer: IOTAEditBuffer;
   EditBlock: IOTAEditBlock;
   Column: Integer;
+  EndCol: Integer;
   BindingRec: TKeyBindingRec;
   {$IF CompilerVersion <= 20.0}
   SearchForwardEnvProp: TPropField;
@@ -900,7 +901,12 @@ begin
             { First jump to the first non-whitespace and then to the BOL }
             Column := EditPosition.Column;
             EditPosition.MoveBOL;
-            while (EditPosition.Character in [#9, ' ']) and EditPosition.MoveRelative(0, 1) do
+            EndCol := GetEndColumn(EditPosition);
+            // Bound by EndCol so Character is never read at/past EOL (on an
+            // all-whitespace line this loop reaches EOL; reading Character there
+            // raises on Delphi 13). This matches the safe idiom used elsewhere.
+            while (EditPosition.Column < EndCol) and (EditPosition.Character in [#9, ' ']) and
+                  EditPosition.MoveRelative(0, 1) do
               ;
             if EditPosition.Column = Column then
               EditPosition.MoveBOL;
@@ -911,7 +917,9 @@ begin
             { First jump to the BOL and then to the first non-whitespace }
             if EditPosition.Column = 1 then
             begin
-              while (EditPosition.Character in [#9, ' ']) and EditPosition.MoveRelative(0, 1) do
+              EndCol := GetEndColumn(EditPosition);
+              while (EditPosition.Column < EndCol) and (EditPosition.Character in [#9, ' ']) and
+                    EditPosition.MoveRelative(0, 1) do
                 ;
               BindingResult := krHandled;
             end;

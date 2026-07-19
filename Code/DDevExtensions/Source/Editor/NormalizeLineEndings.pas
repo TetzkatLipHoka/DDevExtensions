@@ -9,20 +9,27 @@
 unit NormalizeLineEndings;
 
 {
-  Optional feature: when a Delphi source file is opened in the editor, rewrite
-  any lone LF or lone CR line endings to CRLF. LF-only files (e.g. produced by
-  cross-platform tools) confuse parts of the IDE - notably the package-source
-  updater, which mangles keywords when adding/removing units in an LF-only .dpk.
+  Optional feature: when a Delphi source file is opened, rewrite any lone LF or
+  lone CR line ending to CRLF. LF-only files (e.g. produced by cross-platform
+  tools) confuse parts of the IDE - notably the package-source updater, which
+  mangles keywords when adding/removing units in an LF-only .dpk.
 
-  The change goes into the editor buffer as a single undoable edit (the file
-  shows as modified and the user controls when it is saved), and only when a
-  file actually needs it - already-CRLF files are left untouched, so they do
-  NOT show up as modified.
+  Implementation: normalize the file ON DISK on ofnFileOpening, i.e. BEFORE the
+  IDE reads it. That is deliberately NOT done through the editor buffer:
+    * The editor has no public API to set a buffer's end-of-line style
+      (TOTAEndLine is read-only per-line info). When an all-LF file is loaded,
+      the editor remembers "LF" and re-emits the file's FINAL line ending as a
+      lone LF on save even after the buffer content was rewritten to CRLF - so a
+      buffer rewrite leaves a stray trailing 0x0A (fixed only on the next load).
+    * Normalizing the bytes on disk before the load sidesteps all of that: the
+      IDE loads a clean CRLF file, detects CRLF, no stray trailing LF, and the
+      file is not left marked-as-modified.
 
-  The rewrite is DEFERRED off the ofnFileOpened notification via a short timer:
-  modifying the buffer from inside the open callback (while the IDE is still
-  loading it) is fragile, so we queue the file name and process it once the IDE
-  is idle and the buffer is fully populated.
+  Only files that actually need it are rewritten (already-CRLF files are left
+  untouched, so clean files are never rewritten), read-only files are skipped,
+  and every step is guarded so a failure can never break file opening.
+  Byte-level CR/LF handling is UTF-8 safe (CR/LF never occur inside a multibyte
+  code point), and a BOM or any other bytes are preserved verbatim.
 }
 
 interface
@@ -32,7 +39,7 @@ procedure InstallNormalizeLineEndings(Value: Boolean);
 implementation
 
 uses
-  Windows, SysUtils, Classes, ExtCtrls, ToolsAPI, ToolsAPIHelpers;
+  Windows, SysUtils, Classes, ToolsAPI;
 
 type
   TLineEndingNotifier = class(TNotifierObject, IOTAIDENotifier)
@@ -43,17 +50,8 @@ type
     procedure AfterCompile(Succeeded: Boolean);
   end;
 
-  { holds the TTimer.OnTimer method (a plain procedure can't be assigned to it) }
-  TTimerHandler = class
-    procedure DoTimer(Sender: TObject);
-  end;
-
 var
   GNotifierIndex: Integer = -1;
-  GPending: TStringList;
-  GTimer: TTimer;
-  GTimerHandler: TTimerHandler;
-  GProcessing: Boolean;
 
 { Only touch Delphi source files - project/desktop/binary files are left alone. }
 function IsNormalizableExt(const FileName: string): Boolean;
@@ -66,9 +64,8 @@ begin
 end;
 
 { Convert every lone LF and lone CR to CRLF; Changed is True only if the input
-  was not already fully CRLF (so already-normalized files are not rewritten).
-  UTF8-safe: CR ($0D) and LF ($0A) never occur inside a UTF-8 multibyte code. }
-function NormalizeToCRLF(const S: UTF8String; out Changed: Boolean): UTF8String;
+  was not already fully CRLF (so already-normalized files are not rewritten). }
+function NormalizeToCRLF(const S: AnsiString; out Changed: Boolean): AnsiString;
 var
   n, i, j: Integer;
   c: AnsiChar;
@@ -109,68 +106,55 @@ begin
   SetLength(Result, j);
 end;
 
-procedure NormalizeSourceEditor(const Editor: IOTASourceEditor);
+function ReadFileBytes(const FileName: string): AnsiString;
 var
-  Src, Norm: UTF8String;
-  Changed: Boolean;
-  Writer: IOTAEditWriter;
+  Stream: TFileStream;
 begin
-  Src := GetEditorSource(Editor);
-  if Src = '' then
-    Exit;
-  Norm := NormalizeToCRLF(Src, Changed);
-  if not Changed then
-    Exit;
-  Writer := Editor.CreateUndoableWriter;
-  Writer.DeleteTo(MaxInt);
-  Writer.Insert(PAnsiChar(Norm));
+  Result := '';
+  Stream := TFileStream.Create(FileName, fmOpenRead or fmShareDenyNone);
+  try
+    if Stream.Size > 0 then
+    begin
+      SetLength(Result, Stream.Size);
+      Stream.ReadBuffer(Result[1], Stream.Size);
+    end;
+  finally
+    Stream.Free;
+  end;
 end;
 
-procedure NormalizeFile(const FileName: string);
+procedure WriteFileBytes(const FileName: string; const Data: AnsiString);
 var
-  ModServices: IOTAModuleServices;
-  Module: IOTAModule;
-  i: Integer;
-  Src: IOTASourceEditor;
+  Stream: TFileStream;
+begin
+  Stream := TFileStream.Create(FileName, fmCreate);
+  try
+    if Length(Data) > 0 then
+      Stream.WriteBuffer(Data[1], Length(Data));
+  finally
+    Stream.Free;
+  end;
+end;
+
+procedure NormalizeDiskFile(const FileName: string);
+var
+  Attr: Integer;
+  Data, Norm: AnsiString;
+  Changed: Boolean;
 begin
   if not IsNormalizableExt(FileName) then
     Exit;
-  ModServices := BorlandIDEServices as IOTAModuleServices;
-  Module := ModServices.FindModule(FileName);
-  if Module = nil then
-    Exit; // closed again meanwhile
-  for i := 0 to Module.GetModuleFileCount - 1 do
-    if Supports(Module.GetModuleFileEditor(i), IOTASourceEditor, Src) and
-       SameText(Src.FileName, FileName) then
-      NormalizeSourceEditor(Src);
-end;
-
-procedure TTimerHandler.DoTimer(Sender: TObject);
-var
-  Names: TStringList;
-  i: Integer;
-begin
-  GTimer.Enabled := False;
-  if GProcessing or (GPending = nil) then
+  if not FileExists(FileName) then
+    Exit;                             // new/virtual file - nothing on disk yet
+  Attr := FileGetAttr(FileName);
+  if (Attr < 0) or ((Attr and faReadOnly) <> 0) then
+    Exit;                             // read-only: don't touch (e.g. VCS-locked)
+  Data := ReadFileBytes(FileName);
+  if Data = '' then
     Exit;
-  GProcessing := True;
-  try
-    Names := TStringList.Create;
-    try
-      Names.Assign(GPending);
-      GPending.Clear;
-      for i := 0 to Names.Count - 1 do
-      try
-        NormalizeFile(Names[i]);
-      except
-        // one bad file must never break the others or the IDE
-      end;
-    finally
-      Names.Free;
-    end;
-  finally
-    GProcessing := False;
-  end;
+  Norm := NormalizeToCRLF(Data, Changed);
+  if Changed then
+    WriteFileBytes(FileName, Norm);   // IDE reads the clean CRLF file right after
 end;
 
 { TLineEndingNotifier }
@@ -178,16 +162,12 @@ end;
 procedure TLineEndingNotifier.FileNotification(NotifyCode: TOTAFileNotification;
   const FileName: string; var Cancel: Boolean);
 begin
-  if (NotifyCode <> ofnFileOpened) or (GPending = nil) then
+  if NotifyCode <> ofnFileOpening then
     Exit;
-  if not IsNormalizableExt(FileName) then
-    Exit;
-  if GPending.IndexOf(FileName) < 0 then
-    GPending.Add(FileName);
-  if GTimer <> nil then
-  begin
-    GTimer.Enabled := False; // re-arm so bursts of opens coalesce
-    GTimer.Enabled := True;
+  try
+    NormalizeDiskFile(FileName);
+  except
+    // normalizing must never break opening the file
   end;
 end;
 
@@ -200,21 +180,12 @@ begin
 end;
 
 procedure InstallNormalizeLineEndings(Value: Boolean);
-var
-  Services: IOTAServices;
 begin
   if Value then
   begin
     if GNotifierIndex >= 0 then
       Exit; // already installed
-    GPending := TStringList.Create;
-    GTimerHandler := TTimerHandler.Create;
-    GTimer := TTimer.Create(nil);
-    GTimer.Enabled := False;
-    GTimer.Interval := 150;
-    GTimer.OnTimer := GTimerHandler.DoTimer;
-    Services := BorlandIDEServices as IOTAServices;
-    GNotifierIndex := Services.AddNotifier(TLineEndingNotifier.Create);
+    GNotifierIndex := (BorlandIDEServices as IOTAServices).AddNotifier(TLineEndingNotifier.Create);
   end
   else
   begin
@@ -223,9 +194,6 @@ begin
       (BorlandIDEServices as IOTAServices).RemoveNotifier(GNotifierIndex);
       GNotifierIndex := -1;
     end;
-    FreeAndNil(GTimer);
-    FreeAndNil(GTimerHandler);
-    FreeAndNil(GPending);
   end;
 end;
 

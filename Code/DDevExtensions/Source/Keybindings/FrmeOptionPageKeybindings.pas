@@ -857,6 +857,7 @@ var
   Column: Integer;
   EndCol: Integer;
   BindingRec: TKeyBindingRec;
+  Deferred: Boolean;
   {$IF CompilerVersion <= 20.0}
   SearchForwardEnvProp: TPropField;
   OldSearchForwardValue: Boolean;
@@ -992,7 +993,21 @@ begin
 
     if BindingResult = krUnhandled then
     begin
-      if Context.GetKeyBindingRec(BindingRec) and Context.KeyboardServices.GetNextBindingRec(BindingRec) then
+      Deferred := False;
+      try
+        Deferred := Context.GetKeyBindingRec(BindingRec) and
+          Context.KeyboardServices.GetNextBindingRec(BindingRec);
+      except
+        // Delphi 13 x64: TKeyboardServices.FillBindingRec (called by
+        // GetNextBindingRec) raises EStringListError via
+        // TStrings.GetValueFromIndex when our binding sits at the end of the
+        // binding chain. Treat that as "no next binding" and emulate the
+        // default key behavior below instead of letting the exception escape
+        // into the IDE's key dispatcher (visible as an error dialog on every
+        // Home press at column > 1).
+        Deferred := False;
+      end;
+      if Deferred then
       begin
         { Let the next proc struggle with the IDE }
         BindingResult := krNextProc;

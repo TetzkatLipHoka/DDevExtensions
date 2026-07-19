@@ -75,6 +75,7 @@ uses
   FileStreams in '..\..\..\Shared\FileStreams.pas',
   FrmSwitchToModuleProject in '..\Source\CompileProgress\FrmSwitchToModuleProject.pas' {FormSwitchToModuleProject},
   FocusEditor in '..\Source\Editor\FocusEditor.pas',
+  ProjectMgrShortCuts in '..\Source\Editor\ProjectMgrShortCuts.pas',
   StrucViewSearch in '..\Source\DSUFeatures\StrucViewSearch.pas',
   EditPopupCtrl in '..\Source\EditPopupCtrl.pas',
   VirtTreeHandler in '..\Source\VirtTreeHandler.pas',

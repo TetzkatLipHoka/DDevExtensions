@@ -18,9 +18,9 @@ implementation
 
 uses
   SysUtils, Classes, Main,
-//  {$IF CompilerVersion < 21.0} // Delphi 2009 // MS not avail
-//  ProjectMgrShortCuts,
-//  {$IFEND}
+  {$IF CompilerVersion < 21.0} // pre-2010 only (PM was rebuilt in RAD Studio 2010)
+  ProjectMgrShortCuts,
+  {$IFEND}
   FrmeOptionPageFormDesigner,
   FrmProjectSettingsSetVersioninfo, FocusEditor, CompileProgress,
   IDEMenuHandler, FrmeOptionPageKeybindings,
@@ -130,10 +130,10 @@ begin
       RegisterLateLoader(StrucViewSearch.InitPlugin);
     {$ENDIF}
 
-//    {$IF CompilerVersion < 21.0} // MS not avail (unit commented out in uses above)
-//    if DisabledPlugins.IndexOf('ProjectMgrShortCuts') = -1 then
-//      RegisterLateLoader(ProjectMgrShortCuts.InitPlugin);
-//    {$IFEND}
+    {$IF CompilerVersion < 21.0} // pre-2010: PM build-order shortcuts (no-op unit otherwise)
+    if DisabledPlugins.IndexOf('ProjectMgrShortCuts') = -1 then
+      RegisterLateLoader(ProjectMgrShortCuts.InitPlugin);
+    {$IFEND}
 
     if DisabledPlugins.IndexOf('StartParameter') = -1 then
       RegisterExpertLoader(StartParameterManagerReg.InitPlugin);

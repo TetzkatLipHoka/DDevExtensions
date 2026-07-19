@@ -54,6 +54,7 @@ type
     FConfirmDlgOnDebugCtrlF1: Boolean;
     FDisableAlphaSortClassCompletion: Boolean;
     FF12HotKeySupport: Boolean;
+    FNormalizeLineEndings: Boolean;
 
     procedure SetDisablePackageCache(Value: Boolean);
     procedure SetEditorDblClickAction(Value: TEditorDblClickAction);
@@ -77,6 +78,7 @@ type
     //procedure SetDisableEditorClearType(Value: Boolean);
     procedure SetDisableAlphaSortClassCompletion(const Value: Boolean);
     procedure SetF12HotKeySupport(const Value: Boolean);
+    procedure SetNormalizeLineEndings(const Value: Boolean);
   protected
     FTimerStructureView: TTimer;
     FLastParsingDots: Integer;
@@ -126,6 +128,7 @@ type
     property ConfirmDlgOnDebugCtrlF1: Boolean read FConfirmDlgOnDebugCtrlF1 write SetConfirmDlgOnDebugCtrlF1;
     property DisableAlphaSortClassCompletion: Boolean read FDisableAlphaSortClassCompletion write SetDisableAlphaSortClassCompletion;
     property F12HotKeySupport: Boolean read FF12HotKeySupport write SetF12HotKeySupport;
+    property NormalizeLineEndings: Boolean read FNormalizeLineEndings write SetNormalizeLineEndings;
   end;
 
   TFrameOptionPageDSUFeatures = class(TFrameBase, ITreePageComponent)
@@ -146,6 +149,7 @@ type
     chkDisableAlphaSortClassCompletion: TCheckBox;
     chkAutoCloseCompileDlg: TCheckBox;
     chkF12HotKeySupport: TCheckBox;
+    chkNormalizeLineEndings: TCheckBox;
   private
     { Private-Deklarationen }
     FDSUFeatures: TDSUFeaturesConfig;
@@ -167,7 +171,7 @@ implementation
 
 uses
   Main, DSUFeatures, StrUtils, IDEHooks, Hooking, IDEUtils, StrucViewSearch, ToolsAPIHelpers,
-  AppConsts, DisableAlphaSortClassCompletion, F12HotKeySupport, CompileProgress;
+  AppConsts, DisableAlphaSortClassCompletion, F12HotKeySupport, NormalizeLineEndings, CompileProgress;
 
 {$R *.dfm}
 
@@ -239,6 +243,7 @@ begin
   chkConfirmDlgOnDebugCtrlF1.Checked := FDSUFeatures.ConfirmDlgOnDebugCtrlF1;
   chkDisableAlphaSortClassCompletion.Checked := FDSUFeatures.DisableAlphaSortClassCompletion;
   chkF12HotKeySupport.Checked := FDSUFeatures.F12HotKeySupport;
+  chkNormalizeLineEndings.Checked := FDSUFeatures.NormalizeLineEndings;
 
   {$IF CompilerVersion < 20.0}
   // mirror of the checkbox injected into the compile progress dialog - with
@@ -287,6 +292,7 @@ begin
   FDSUFeatures.ConfirmDlgOnDebugCtrlF1 := chkConfirmDlgOnDebugCtrlF1.Checked;
   FDSUFeatures.DisableAlphaSortClassCompletion := chkDisableAlphaSortClassCompletion.Checked;
   FDSUFeatures.F12HotKeySupport := chkF12HotKeySupport.Checked;
+  FDSUFeatures.NormalizeLineEndings := chkNormalizeLineEndings.Checked;
   FDSUFeatures.Save;
 
   {$IF CompilerVersion < 20.0}
@@ -1551,6 +1557,15 @@ begin
   begin
     FF12HotKeySupport := Value;
     InstallF12HotKeySupport(FF12HotKeySupport);
+  end;
+end;
+
+procedure TDSUFeaturesConfig.SetNormalizeLineEndings(const Value: Boolean);
+begin
+  if Value <> FNormalizeLineEndings then
+  begin
+    FNormalizeLineEndings := Value;
+    InstallNormalizeLineEndings(FNormalizeLineEndings);
   end;
 end;
 

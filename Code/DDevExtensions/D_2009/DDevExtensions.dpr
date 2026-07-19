@@ -92,6 +92,7 @@ uses
   FrmReloadFiles in '..\Source\Editor\FrmReloadFiles.pas' {FormReloadFiles},
   DocModuleHandler in '..\Source\Editor\DocModuleHandler.pas',
   CodeInsightHandling in '..\Source\Editor\CodeInsightHandling.pas',
+  NormalizeLineEndings in '..\Source\Editor\NormalizeLineEndings.pas',
   DisableAlphaSortClassCompletion in '..\Source\DSUFeatures\DisableAlphaSortClassCompletion.pas',
   F12HotKeySupport in '..\Source\DSUFeatures\F12HotKeySupport.pas',
   RemoveTextHeightProperty in '..\Source\FormDesignerHelpers\RemoveTextHeightProperty.pas',

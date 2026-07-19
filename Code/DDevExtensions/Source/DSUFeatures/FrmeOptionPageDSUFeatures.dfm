@@ -1,10 +1,10 @@
 inherited FrameOptionPageDSUFeatures: TFrameOptionPageDSUFeatures
   Width = 385
-  Height = 390
+  Height = 414
   TabStop = True
   inherited pnlClient: TPanel
     Width = 385
-    Height = 341
+    Height = 365
     object lblEditorTabDblClickAction: TLabel
       Left = 8
       Top = 216
@@ -170,6 +170,16 @@ inherited FrameOptionPageDSUFeatures: TFrameOptionPageDSUFeatures
       ParentShowHint = False
       ShowHint = True
       TabOrder = 14
+    end
+    object chkNormalizeLineEndings: TCheckBox
+      Left = 8
+      Top = 343
+      Width = 369
+      Height = 17
+      Caption = 'Normalize line endings to CRLF when a file is opened'
+      ParentShowHint = False
+      ShowHint = True
+      TabOrder = 15
     end
   end
   inherited pnlDescription: TPanel

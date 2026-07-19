@@ -186,7 +186,7 @@ begin
      ThemingServices.IDEThemingEnabled then
   begin
     ThemingServices.RegisterFormClass(TCustomFormClass(ClassType));
-    ThemingServices.ApplyTheme(Self);
+    ThemeFixupControls(Self); // ApplyTheme + hotkey-control repair
   end;
   if StyleName = '' then
   begin
@@ -230,13 +230,42 @@ end;
 procedure TFormBase.ThemeFixupControls(AParent: TWinControl);
 var
   ThemingServices: IOTAIDEThemingServices250;
+
+  procedure Walk(Parent: TWinControl);
+  var
+    I: Integer;
+    C: TControl;
+  begin
+    for I := 0 to Parent.ControlCount - 1 do
+    begin
+      C := Parent.Controls[I];
+      // 10.4..12: the IDE's ApplyTheme takes the native hotkey control out of
+      // the styling (fully native black-on-white, not even the background is
+      // styled). Put it back under the style engine - the VCL registers a
+      // TEditStyleHook for TCustomHotKey, and the hooked control also honors
+      // the style's text color (Delphi 13 themes it this way by itself; there
+      // this fixup is a no-op).
+      if C is TCustomHotKey then
+      begin
+        C.StyleName := '';
+        C.StyleElements := [seFont, seClient, seBorder];
+      end;
+      if C is TWinControl then
+        Walk(TWinControl(C));
+    end;
+  end;
+
 begin
   // 10.4+: option page frames are created after the dialog's ApplyIDETheme
   // ran; apply the IDE style to the late-created control tree as well (the
-  // style engine handles the control colors itself, so no manual fixups)
+  // style engine handles the control colors itself, so no manual fixups
+  // beyond the hotkey repair above)
   if Supports(BorlandIDEServices, IOTAIDEThemingServices250, ThemingServices) and
      ThemingServices.IDEThemingEnabled then
+  begin
     ThemingServices.ApplyTheme(AParent);
+    Walk(AParent);
+  end;
 end;
 {$IFEND}
 

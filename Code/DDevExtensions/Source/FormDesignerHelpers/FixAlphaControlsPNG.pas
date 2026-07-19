@@ -35,6 +35,32 @@ uses
 
 {$IF Defined(COMPILER12_UP) and Defined(INCLUDE_ACPNGFIX)}
 
+{
+  acPNG (AlphaControls) DFM stream layout that LoadFromStream below parses
+  -----------------------------------------------------------------------
+  A TPicture writes its graphic as:  [len:Byte]['<GraphicClassName>'][graphic data]
+  (TPicture.WriteData: Write(CName, Length(CName)+1), then Graphic.WriteData).
+
+  AlphaControls' graphic class is ALSO named 'TPNGGraphic', and it does NOT
+  store real PNG bytes - it stores a Windows BMP under that class name, with a
+  few of its own header bytes in between:
+
+    offset 0            : len byte      = 11  (Length('TPNGGraphic'))
+    offset 1 .. 11      : 'TPNGGraphic' (the class name; == our ClassName)
+    offset 12 .. ~21    : acPNG's own small header/padding (variable)
+    offset (first 'BM') : 'B''M' + standard BMP (BITMAPFILEHEADER ...)
+
+  So we: read 11 bytes at position 1, confirm they equal our ClassName; then
+  scan the next ~10 bytes one at a time for the 'BM' bitmap signature; rewind
+  to the 'B' and load the embedded BMP. Assigning that BMP to the TPngImage
+  turns acPNG's fake PNG into a real image; WriteData then re-streams it as a
+  genuine 'TPngImage' PNG, so the picture becomes portable.
+
+  NB this depends on acPNG's exact byte layout - if AlphaControls ever changes
+  its streaming, the 'BM' scan below stops matching and the load raises
+  EPNGInvalidFileHeader (safe failure, no corruption).
+}
+
 {$IFDEF PNGGraphicBMP}
 procedure TPNGGraphic.LoadFromStream(Stream: TStream);
 const

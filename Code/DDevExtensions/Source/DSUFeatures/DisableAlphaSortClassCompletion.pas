@@ -10,6 +10,10 @@ unit DisableAlphaSortClassCompletion;
 
 {$I ..\DelphiExtension.inc}
 
+{$IFDEF CPUX64}
+  {$DEFINE ALPHASORT_X64_WIP} // D13 x64: IAT-gated reorder + SetSorted no-op (see CPUX64 block)
+{$ENDIF}
+
 interface
 
 procedure InstallDisableAlphaSortClassCompletion(Value: Boolean);
@@ -326,22 +330,39 @@ end;}
 // ---------------------------------------------------------------------------
 //  Delphi 13 x64 implementation. The x86 path scans Complete for byte patterns
 //  and ReplaceRelCallOffset-patches the iterator ctor / GetSymbol / SetSorted
-//  calls. On x64 those calls are IMPORTED from designide370 (Symbols::
-//  TTableIterator) via delphicoreide370 IAT stubs, and there is no separate
-//  SetSorted call (folded into the ctor). All the object layouts this unit
-//  relies on (TSymbolTable.FCount@+8/FSymbolList@+0x10, TBaseSymbol.Next@+8,
-//  TMethodSymbol.FMethodSignature@+0x118, TMethodSignature.HeaderPos@+0x1C/
-//  CodePos@+0x2C, TTableIterator.FCount@+0x18) were confirmed by a diagnostic
-//  round against the live IDE and match exactly what the compiler generates
-//  for these decls on x64 (see scratchpad alphasort_x64_offsets.md).
+//  calls. On x64 the iterator ctor / GetSymbol calls are IMPORTED from
+//  designide370 (Symbols::TTableIterator) via delphicoreide370 IAT stubs. The
+//  TSortedThingList.SetSorted(True) call - the one that re-sorts the collected
+//  "to add" list ALPHABETICALLY right before the implementation stubs are
+//  generated - does exist on x64 too, as an internal E8 call inside Complete
+//  (TSortedThingList is not exported from the 64-bit BPLs, which is why it was
+//  first believed to be folded into the ctor; it is not). All the object
+//  layouts this unit relies on (TSymbolTable.FCount@+8/FSymbolList@+0x10,
+//  TBaseSymbol.Next@+8, TMethodSymbol.FMethodSignature@+0x118,
+//  TMethodSignature.HeaderPos@+0x1C/CodePos@+0x2C, TTableIterator.FCount@+0x18)
+//  were confirmed by a diagnostic round against the live IDE and match exactly
+//  what the compiler generates for these decls on x64.
 //
-//  Wiring strategy: patch the ctor & GetSymbol IAT slots (full 64-bit pointer,
-//  so no rel32 / near-trampoline concern) to gate functions that check whether
-//  the caller's return address is inside TPascalClassCompleter.Complete:
-//    - from Complete  -> our reordering factory / GetSymbol (declaration order)
-//    - otherwise      -> delegate to the real designide ctor / GetSymbol
-//  so the IDE-wide IAT patch is safe for every other caller. The MethodAddPos
-//  redirect is a normal function-entry hook (RedirectOrgCall), as on x86.
+//  Wiring strategy:
+//  - Patch the ctor & GetSymbol IAT slots (full 64-bit pointer, so no rel32 /
+//    near-trampoline concern) to gate functions that check whether the
+//    caller's return address is inside TPascalClassCompleter.Complete:
+//      - from Complete  -> our reordering factory / GetSymbol (decl order)
+//      - otherwise      -> delegate to the real designide ctor / GetSymbol
+//    so the IDE-wide IAT patch is safe for every other caller.
+//  - NOP out the SetSorted(True) call site in Complete. The x86 feature
+//    redirects that call to an empty procedure; same effect. Without it the
+//    completer re-sorts the "to add" list and the generated stubs come out
+//    alphabetical even though the iterator delivered declaration order.
+//  - MethodAddPos redirect as a normal function-entry hook, as on x86.
+//
+//  The ReturnAddress window MUST end at Complete's own epilogue, not at a
+//  fixed size: the symbol range behind the epilogue also contains exception
+//  funclets and the recursive class enumerator used by GetClasses (at
+//  Complete+~0xf80 in D13.1), which creates a Symbols::TTableIterator over
+//  CLASS symbol tables. Substituting our method-comparing iterator there would
+//  read TClassSymbol+0x118 as a TMethodSignature - garbage. The epilogue is
+//  located by matching the frame size taken from the prologue.
 // ---------------------------------------------------------------------------
 const
   sDsgnTableIteratorCtor      = '_ZN7Symbols14TTableIteratorC3EPNS_12TSymbolTableE';
@@ -359,6 +380,9 @@ var
   AlphaCompleteLo, AlphaCompleteHi: NativeUInt;
   AlphaMethodAddPosHooked: Boolean;
   AlphaCtorN, AlphaGetN: Integer;   // DIAG: instrumentation counters
+  AlphaSetSortedCallP: PByte;                  // E8 call site of TSortedThingList.SetSorted(True) in Complete
+  AlphaSetSortedOrgBytes: array[0..4] of Byte; // original call bytes for uninstall
+  AlphaSetSortedPatched: Boolean;
 
 procedure AlphaLog(const S: string);
 var
@@ -455,17 +479,79 @@ begin
   Result := NativeUInt(P) + Len <= NativeUInt(mbi.BaseAddress) + NativeUInt(mbi.RegionSize);
 end;
 
+// Complete's symbol range also covers exception funclets and GetClasses'
+// recursive class enumerator; the function itself ends at the epilogue that
+// releases the frame allocated in the prologue:
+//   prologue: push rbp/rdi/rsi/rbx; subq $FrameSize, %rsp
+//   epilogue: leaq FrameSize(%rbp), %rsp; pop rbx/rsi/rdi/rbp; ret
+// The imm32 frame size makes the 12-byte epilogue unique within the range
+// (funclets and the enumerator use smaller disp8 frames).
+function AlphaFindCompleteEnd(CompleteP: PByte): PByte;
+var
+  FrameSize: Integer;
+  p, limit: PByte;
+begin
+  Result := nil;
+  if (CompleteP[0] <> $55) or (CompleteP[1] <> $57) or (CompleteP[2] <> $56) or
+     (CompleteP[3] <> $53) or (CompleteP[4] <> $48) or (CompleteP[5] <> $81) or
+     (CompleteP[6] <> $EC) then
+    Exit; // unexpected prologue - abort the install
+  FrameSize := PInteger(CompleteP + 7)^;
+  p := CompleteP + 11;
+  limit := CompleteP + $1800;
+  while NativeUInt(p) < NativeUInt(limit) do
+  begin
+    if (p[0] = $48) and (p[1] = $8D) and (p[2] = $A5) and (PInteger(p + 3)^ = FrameSize) and
+       (p[7] = $5B) and (p[8] = $5E) and (p[9] = $5F) and (p[10] = $5D) and (p[11] = $C3) then
+    begin
+      Result := p + 12;
+      Exit;
+    end;
+    Inc(p);
+  end;
+end;
+
+// The alphabetical re-sort of the collected "to add" list, right before the
+// generation loop iterates it:
+//   mov rcx,[rbp+D]    48 8B 8D dd dd dd dd   D = the thing-list local
+//   mov dl,1           B2 01
+//   call SetSorted     E8 rr rr rr rr         <- result points here
+//   xor eax,eax        33 C0
+//   mov rcx,[rbp+D]    48 8B 8D dd dd dd dd   (same D)
+//   mov ebx,[rcx+10]   8B 59 10               (list count -> generation loop)
+function AlphaFindSetSortedCall(CompleteP, LimitP: PByte): PByte;
+var
+  p: PByte;
+begin
+  Result := nil;
+  p := CompleteP;
+  while NativeUInt(p) + 26 <= NativeUInt(LimitP) do
+  begin
+    if (p[0] = $48) and (p[1] = $8B) and (p[2] = $8D) and
+       (p[7] = $B2) and (p[8] = $01) and (p[9] = $E8) and
+       (p[14] = $33) and (p[15] = $C0) and
+       (p[16] = $48) and (p[17] = $8B) and (p[18] = $8D) and
+       (p[23] = $8B) and (p[24] = $59) and (p[25] = $10) and
+       (PInteger(p + 3)^ = PInteger(p + 19)^) then
+    begin
+      Result := p + 9;
+      Exit;
+    end;
+    Inc(p);
+  end;
+end;
+
 // Locate the delphicoreide IAT slot that Complete uses to reach a designide
 // export, by scanning Complete for the E8 call whose import stub reads a slot
 // currently holding RealFn.
-function AlphaFindIatSlot(CompleteP, RealFn: Pointer): PPointer;
+function AlphaFindIatSlot(CompleteP, LimitP: PByte; RealFn: Pointer): PPointer;
 var
   p, limit, t: PByte;
   slot: PPointer;
 begin
   Result := nil;
-  p := PByte(CompleteP);
-  limit := p + $1200;
+  p := CompleteP;
+  limit := LimitP;
   while NativeUInt(p) < NativeUInt(limit) do
   begin
     if p^ = $E8 then
@@ -504,9 +590,11 @@ begin
 end;
 
 procedure InstallAlphaSortX64(Value: Boolean);
+const
+  NopCall: array[0..4] of Byte = ($90, $90, $90, $90, $90);
 var
   hCore, hDsgn: THandle;
-  CompleteP: Pointer;
+  CompleteP, CompleteEndP: PByte;
 begin
   if Value then
   begin
@@ -534,19 +622,37 @@ begin
       AlphaLog('install: Complete not resolved');
       Exit;
     end;
+
+    CompleteEndP := AlphaFindCompleteEnd(CompleteP);
+    if CompleteEndP = nil then
+    begin
+      AlphaLog('install: Complete epilogue not found');
+      Exit;
+    end;
+
+    // All-or-nothing: without the SetSorted no-op the completer re-sorts the
+    // "to add" list and the output stays alphabetical, so don't install at all.
+    AlphaSetSortedCallP := AlphaFindSetSortedCall(CompleteP, CompleteEndP);
+    if AlphaSetSortedCallP = nil then
+    begin
+      AlphaLog('install: SetSorted call site not found');
+      Exit;
+    end;
+
     AlphaCompleteLo := NativeUInt(CompleteP);
-    AlphaCompleteHi := AlphaCompleteLo + $1200;
+    AlphaCompleteHi := NativeUInt(CompleteEndP);
     AlphaCtorN := 0;   // DIAG
     AlphaGetN := 0;    // DIAG
 
-    AlphaCtorIatSlot := AlphaFindIatSlot(CompleteP, AlphaOrgCtor);
-    AlphaGetSymIatSlot := AlphaFindIatSlot(CompleteP, AlphaOrgGetSym);
+    AlphaCtorIatSlot := AlphaFindIatSlot(CompleteP, CompleteEndP, AlphaOrgCtor);
+    AlphaGetSymIatSlot := AlphaFindIatSlot(CompleteP, CompleteEndP, AlphaOrgGetSym);
     if (AlphaCtorIatSlot = nil) or (AlphaGetSymIatSlot = nil) then
     begin
       AlphaLog(Format('install: IAT slot not found (ctor=%p getsym=%p)',
         [AlphaCtorIatSlot, AlphaGetSymIatSlot]));
       AlphaCtorIatSlot := nil;
       AlphaGetSymIatSlot := nil;
+      AlphaSetSortedCallP := nil;
       Exit;
     end;
 
@@ -555,6 +661,7 @@ begin
       AlphaLog('install: ctor slot patch failed');
       AlphaCtorIatSlot := nil;
       AlphaGetSymIatSlot := nil;
+      AlphaSetSortedCallP := nil;
       Exit;
     end;
     if not AlphaPatchSlot(AlphaGetSymIatSlot, @AlphaGetSymGate) then
@@ -563,8 +670,26 @@ begin
       AlphaLog('install: getsym slot patch failed');
       AlphaCtorIatSlot := nil;
       AlphaGetSymIatSlot := nil;
+      AlphaSetSortedCallP := nil;
       Exit;
     end;
+
+    // No-op the alphabetical re-sort (x86 redirects this call to an empty
+    // procedure; NOPing the E8 site has the same effect and needs no rel32-
+    // reachable target). The mov rcx/mov dl setup before it stays - harmless.
+    Move(AlphaSetSortedCallP^, AlphaSetSortedOrgBytes, SizeOf(AlphaSetSortedOrgBytes));
+    if not InjectCode(AlphaSetSortedCallP, @NopCall[0], SizeOf(NopCall)) then
+    begin
+      AlphaPatchSlot(AlphaCtorIatSlot, AlphaOrgCtor);
+      AlphaPatchSlot(AlphaGetSymIatSlot, AlphaOrgGetSym);
+      AlphaLog('install: SetSorted nop patch failed');
+      AlphaCtorIatSlot := nil;
+      AlphaGetSymIatSlot := nil;
+      AlphaSetSortedCallP := nil;
+      Exit;
+    end;
+    AlphaSetSortedPatched := True;
+    FlushInstructionCache(GetCurrentProcess, AlphaSetSortedCallP, SizeOf(NopCall));
 
     // Insertion-position redirect (same as x86): make MethodAddPos behave as if
     // the new method name were empty. RedirectOrgCall handles the x64 trampoline.
@@ -577,8 +702,8 @@ begin
       AlphaMethodAddPosHooked := True;
     end;
 
-    AlphaLog(Format('install: active (ctorSlot=%p getsymSlot=%p Complete=%p)',
-      [AlphaCtorIatSlot, AlphaGetSymIatSlot, CompleteP]));
+    AlphaLog(Format('install: active (ctorSlot=%p getsymSlot=%p setsorted=%p Complete=%p..%p)',
+      [AlphaCtorIatSlot, AlphaGetSymIatSlot, AlphaSetSortedCallP, CompleteP, CompleteEndP]));
   end
   else
   begin
@@ -592,6 +717,13 @@ begin
       AlphaPatchSlot(AlphaGetSymIatSlot, AlphaOrgGetSym);
       AlphaGetSymIatSlot := nil;
     end;
+    if AlphaSetSortedPatched then
+    begin
+      InjectCode(AlphaSetSortedCallP, @AlphaSetSortedOrgBytes[0], SizeOf(AlphaSetSortedOrgBytes));
+      FlushInstructionCache(GetCurrentProcess, AlphaSetSortedCallP, SizeOf(AlphaSetSortedOrgBytes));
+      AlphaSetSortedPatched := False;
+    end;
+    AlphaSetSortedCallP := nil;
     if AlphaMethodAddPosHooked then
     begin
       RestoreOrgCall(@TClassSymbol_MethodAddPos, @OrgTClassSymbol_MethodAddPos);
@@ -715,18 +847,15 @@ end;
 {$ELSE}
 begin
   {$IFDEF ALPHASORT_X64_WIP}
-  // Win64 (Delphi 13): IAT-gated reorder + MethodAddPos redirect (see CPUX64 block above).
+  // Win64 (Delphi 13): IAT-gated reorder + SetSorted no-op + MethodAddPos redirect
+  // (see CPUX64 block above).
   InstallAlphaSortX64(Value);
   {$ELSE}
-  // Win64: DISABLED pending deeper RE. The reorder iterator was confirmed working (it feeds
-  // TPascalClassCompleter.Complete the methods in declaration order), but on D13 that is NOT the
-  // lever that orders the generated implementation stubs - the completer re-sorts its "to add"
-  // list alphabetically afterwards (the x86 feature also no-ops a TSortedThingList.SetSorted call;
-  // the x64 equivalent has not been located yet), so output stayed alphabetical. The hooks also
-  // destabilised the editor (Home on a blank line raised an exception - likely the IDE-wide
-  // MethodAddPos redirect and/or the ReturnAddress window overshooting Complete into GetClasses).
-  // Full implementation + confirmed x64 offsets are preserved under {$DEFINE ALPHASORT_X64_WIP}
-  // above and in git (65463f8); notes in scratchpad alphasort_x64_offsets.md.
+  // Win64 fallback: feature is a no-op when ALPHASORT_X64_WIP is undefined (the
+  // define is set at the top of this unit). History: first wiring 65463f8 failed
+  // because the internal TSortedThingList.SetSorted(True) call in Complete was
+  // not yet located/no-opped (output stayed alphabetical) and the ReturnAddress
+  // window overshot Complete's epilogue into GetClasses' class enumerator.
   {$ENDIF}
 end;
 {$ENDIF ~CPUX64}

@@ -406,44 +406,54 @@ begin
   Result := NativeUInt(P) + Len <= NativeUInt(mbi.BaseAddress) + NativeUInt(mbi.RegionSize);
 end;
 
-// Round 2: walk a populated TSymbolTable so the true x64 offsets of
-// TBaseSymbol.Next / TMethodSymbol.FMethodSignature / TMethodSignature.* can be
-// read off. FCount is at +0x08, FSymbolList[0..31] at +0x10 (derived from round 1).
+// Round 3: TBaseSymbol.Next @ +0x08 and FShortIdent(ShortString) @ +0x10 are
+// confirmed. Walk each bucket's Next chain, dump each symbol to 0x160 (so
+// FIdent @ +0x110 and FMethodSignature @ +0x118 are visible) and, for the first
+// few symbols, chase the +0x108..+0x120 pointer fields to dump the signature
+// object (TMethodSignature.HeaderPos/CodePos/TypeData).
 procedure DiagDumpTable(ATable: Pointer);
+const
+  NEXT_OFF = $08;
 var
-  cnt, i, off, dumps: Integer;
-  head, tgt: Pointer;
+  cnt, i, off, symDumps, sigDumps: Integer;
+  head, sym, tgt: Pointer;
 begin
   if not DiagReadable(ATable, $10) then Exit;
   cnt := PInteger(PByte(ATable) + 8)^;
   DiagLog(Format('=== populated SymbolTable walk: @%p FCount@+8=%d ===', [ATable, cnt]));
-  dumps := 0;
+  symDumps := 0;
+  sigDumps := 0;
   for i := 0 to 31 do
   begin
-    if dumps >= 48 then Break;
+    if symDumps >= 40 then Break;
     head := PPointer(PByte(ATable) + $10 + i * 8)^;
     if head = nil then Continue;
-    DiagLog(Format('FSymbolList[%d] @+%x = %p:', [i, $10 + i * 8, head]));
-    if DiagReadable(head, $80) then
+    sym := head;
+    while (sym <> nil) and DiagReadable(sym, $160) and (symDumps < 40) do
     begin
-      DiagLog(DiagHexDump(head, $80));
-      Inc(dumps);
-    end;
-    // chase 8-byte-aligned pointer fields (Next chain, FMethodSignature, FIdent buffer)
-    off := 8;
-    while off <= $30 do
-    begin
-      if DiagReadable(PByte(head) + off, 8) then
+      DiagLog(Format('sym bucket[%d] @%p:', [i, sym]));
+      DiagLog(DiagHexDump(sym, $160));
+      Inc(symDumps);
+      // chase the FIdent / FMethodSignature region once for the first few symbols
+      if sigDumps < 6 then
       begin
-        tgt := PPointer(PByte(head) + off)^;
-        if DiagReadable(tgt, $80) then
+        off := $108;
+        while off <= $120 do
         begin
-          DiagLog(Format('  head[%d][+%x]->%p:', [i, off, tgt]));
-          DiagLog(DiagHexDump(tgt, $80));
-          Inc(dumps);
+          if DiagReadable(PByte(sym) + off, 8) then
+          begin
+            tgt := PPointer(PByte(sym) + off)^;
+            if DiagReadable(tgt, $A0) then
+            begin
+              DiagLog(Format('  [+%x]->%p (sig/ident?):', [off, tgt]));
+              DiagLog(DiagHexDump(tgt, $A0));
+              Inc(sigDumps);
+            end;
+          end;
+          Inc(off, 8);
         end;
       end;
-      Inc(off, 8);
+      sym := PPointer(PByte(sym) + NEXT_OFF)^;   // follow Next chain
     end;
   end;
 end;

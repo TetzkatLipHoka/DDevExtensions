@@ -3,7 +3,7 @@ Homepage: https://www.idefixpack.de/ddev
 
 DDevExtensions adds new features to RAD Studio.
 
-Supported Delphi Versions 2009-13
+Supported Delphi Versions 7-13
 
 ## Releases Delphi 2009-13
 
@@ -72,3 +72,5 @@ Start the InstallDDevExtensions.exe and press the <Uninstall> button.
 - Local Start Parameters (default: off) [2009-XE]
 - Project Start Parameters (default: off)
 - Replace TPNGGraphic (Alpha Controls acPNG) with TPngImage
+- Auto-close compile progress dialog on successful compile [<2009]
+- Treat warnings as errors

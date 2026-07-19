@@ -15,7 +15,7 @@ const
 
   sPluginVersion = VersionNumber;
   sPluginName = 'DDevExtensions ' + sPluginVersion;
-  sPluginSmallCopyright = '(C) 2006-2025 Andreas Hausladen';
+  sPluginSmallCopyright = '(C) 2006-2026 Andreas Hausladen';
   sPluginCopyright = 'Copyright ' + sPluginSmallCopyright;
 
 resourcestring

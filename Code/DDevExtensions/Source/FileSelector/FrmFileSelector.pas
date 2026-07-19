@@ -825,9 +825,9 @@ begin
   FAllData := TInfoList.Create;
   FCurrentData := TInfoList.Create(False);
   
-  {$IF CompilerVersion > 33} // MS 30
+  {$IF CompilerVersion >= 34.0} // 10.4+: TControl.StyleName does not exist earlier
   FStyleDark := StyleName.Contains('Dark');
-  {$IFEND}   
+  {$IFEND}
 end;
 
 procedure TFormFileSelector.FormDestroy(Sender: TObject);

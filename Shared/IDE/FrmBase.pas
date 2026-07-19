@@ -138,12 +138,12 @@ begin
 end;
 
 procedure TFormBase.FormCreate(Sender: TObject);
-{$IF CompilerVersion > 33.0} // MS 30
+{$IF CompilerVersion >= 34.0} // 10.4+: TControl.StyleName does not exist earlier (10 Seattle: E2003)
 var
   sName: string;
-{$IFEND}  
+{$IFEND}
 begin
-  {$IF CompilerVersion > 33.0} // 10.3 Rio+
+  {$IF CompilerVersion >= 34.0} // 10.4+: TControl.StyleName does not exist earlier
   for sName in TStyleManager.StyleNames do
   begin
     if sName.StartsWith('Win10IDE_') then

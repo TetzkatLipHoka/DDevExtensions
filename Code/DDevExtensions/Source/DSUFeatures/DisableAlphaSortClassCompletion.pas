@@ -344,6 +344,7 @@ var
   DiagOrgCtor: Pointer;            // original designide ctor
   DiagCompleteLo, DiagCompleteHi: NativeUInt;
   DiagLogged: Integer;            // throttle: only the first few completion calls
+  DiagSymDumped: Boolean;         // round 2: dump the symbol objects of the first populated table once
 
 procedure DiagLog(const S: string);
 var
@@ -392,16 +393,76 @@ begin
   Result := Result + line;
 end;
 
+function DiagReadable(P: Pointer; Len: NativeUInt): Boolean;
+var
+  mbi: TMemoryBasicInformation;
+begin
+  Result := False;
+  if (P = nil) or (NativeUInt(P) < $10000) then Exit;
+  if VirtualQuery(P, mbi, SizeOf(mbi)) = 0 then Exit;
+  if mbi.State <> MEM_COMMIT then Exit;
+  if (mbi.Protect and (PAGE_NOACCESS or PAGE_GUARD)) <> 0 then Exit;
+  // whole range must lie inside this committed region
+  Result := NativeUInt(P) + Len <= NativeUInt(mbi.BaseAddress) + NativeUInt(mbi.RegionSize);
+end;
+
+// Round 2: walk a populated TSymbolTable so the true x64 offsets of
+// TBaseSymbol.Next / TMethodSymbol.FMethodSignature / TMethodSignature.* can be
+// read off. FCount is at +0x08, FSymbolList[0..31] at +0x10 (derived from round 1).
+procedure DiagDumpTable(ATable: Pointer);
+var
+  cnt, i, off, dumps: Integer;
+  head, tgt: Pointer;
+begin
+  if not DiagReadable(ATable, $10) then Exit;
+  cnt := PInteger(PByte(ATable) + 8)^;
+  DiagLog(Format('=== populated SymbolTable walk: @%p FCount@+8=%d ===', [ATable, cnt]));
+  dumps := 0;
+  for i := 0 to 31 do
+  begin
+    if dumps >= 48 then Break;
+    head := PPointer(PByte(ATable) + $10 + i * 8)^;
+    if head = nil then Continue;
+    DiagLog(Format('FSymbolList[%d] @+%x = %p:', [i, $10 + i * 8, head]));
+    if DiagReadable(head, $80) then
+    begin
+      DiagLog(DiagHexDump(head, $80));
+      Inc(dumps);
+    end;
+    // chase 8-byte-aligned pointer fields (Next chain, FMethodSignature, FIdent buffer)
+    off := 8;
+    while off <= $30 do
+    begin
+      if DiagReadable(PByte(head) + off, 8) then
+      begin
+        tgt := PPointer(PByte(head) + off)^;
+        if DiagReadable(tgt, $80) then
+        begin
+          DiagLog(Format('  head[%d][+%x]->%p:', [i, off, tgt]));
+          DiagLog(DiagHexDump(tgt, $80));
+          Inc(dumps);
+        end;
+      end;
+      Inc(off, 8);
+    end;
+  end;
+end;
+
 function DiagIteratorCtor(AClass: Pointer; AllocFlag: NativeInt; ATable: Pointer): Pointer;
 var
   Org: TIteratorCtorProc;
   ra: NativeUInt;
+  inComplete: Boolean;
 begin
   Org := TIteratorCtorProc(DiagOrgCtor);
   Result := Org(AClass, AllocFlag, ATable);   // behavior-neutral: real ctor runs unchanged
 
   ra := NativeUInt(ReturnAddress);
-  if (DiagLogged < 4) and (ra >= DiagCompleteLo) and (ra < DiagCompleteHi) then
+  inComplete := (ra >= DiagCompleteLo) and (ra < DiagCompleteHi);
+  if not inComplete then
+    Exit;
+
+  if DiagLogged < 4 then
   begin
     Inc(DiagLogged);
     try
@@ -420,6 +481,17 @@ begin
       end;
     except
       DiagLog('  (exception during dump)');
+    end;
+  end;
+
+  // Round 2: dump the first populated table's symbol objects (once).
+  if (not DiagSymDumped) and DiagReadable(ATable, $10) and (PInteger(PByte(ATable) + 8)^ > 0) then
+  begin
+    DiagSymDumped := True;
+    try
+      DiagDumpTable(ATable);
+    except
+      DiagLog('  (exception during table walk)');
     end;
   end;
 end;
@@ -498,6 +570,7 @@ begin
 
     DiagOrgCtor := RealCtor;
     DiagLogged := 0;
+    DiagSymDumped := False;
     if VirtualProtect(DiagCtorIatSlot, SizeOf(Pointer), PAGE_READWRITE, OldProt) then
     begin
       DiagCtorIatSlot^ := @DiagIteratorCtor;

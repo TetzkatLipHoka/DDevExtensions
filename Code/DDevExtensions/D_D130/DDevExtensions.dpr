@@ -22,6 +22,7 @@ uses
   madListHardware,
   madListProcesses,
   madListModules,
+  DiagHiddenExcept in '..\Source\DiagHiddenExcept.pas',
   {$ENDIF}
   Windows,
   SysUtils,

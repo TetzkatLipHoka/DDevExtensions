@@ -99,7 +99,7 @@ end;
 
 uses
   Hooking, IDEHooks, StrUtils, ActiveX, Registry, ComObj, IDEUtils, ShellAPI, AppConsts,
-  Consts, CommCtrl, ToolsAPIHelpers;
+  Consts, CommCtrl, ToolsAPIHelpers, NormalizeLineEndings;
 
 {$R *.dfm}
 
@@ -277,6 +277,14 @@ begin
             Form.Free;
           end;
         end;
+        // If the "normalize line endings" feature is on, fix the changed files
+        // on disk before the reload reads them. External changes (git checkout,
+        // an editor revert) that flip a file back to LF never raise
+        // ofnFileOpening, so the on-open normalizer cannot see them - this is
+        // where they surface.
+        if NormalizeLineEndingsActive then
+          for I := 0 to ReloadModules.Count - 1 do
+            NormalizeDiskFile(TDocModule(ReloadModules[I]).FileName);
         TFormReloadFiles.ReloadFiles(ReloadModules);
       end;
     finally

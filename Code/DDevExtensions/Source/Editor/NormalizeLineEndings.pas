@@ -35,6 +35,13 @@ unit NormalizeLineEndings;
 interface
 
 procedure InstallNormalizeLineEndings(Value: Boolean);
+// True while the feature is enabled - lets other units (e.g. the reload-files
+// hook, which fires on external changes that never raise ofnFileOpening) run
+// the same normalization on their code path.
+function NormalizeLineEndingsActive: Boolean;
+// Normalize FileName on disk to CRLF (safe no-op if it is not a source file,
+// is read-only, is already CRLF, or cannot be accessed). Fully self-guarding.
+procedure NormalizeDiskFile(const FileName: string);
 
 implementation
 
@@ -52,6 +59,12 @@ type
 
 var
   GNotifierIndex: Integer = -1;
+  GActive: Boolean;
+
+function NormalizeLineEndingsActive: Boolean;
+begin
+  Result := GActive;
+end;
 
 { Only touch Delphi source files - project/desktop/binary files are left alone. }
 function IsNormalizableExt(const FileName: string): Boolean;
@@ -142,19 +155,23 @@ var
   Data, Norm: AnsiString;
   Changed: Boolean;
 begin
-  if not IsNormalizableExt(FileName) then
-    Exit;
-  if not FileExists(FileName) then
-    Exit;                             // new/virtual file - nothing on disk yet
-  Attr := FileGetAttr(FileName);
-  if (Attr < 0) or ((Attr and faReadOnly) <> 0) then
-    Exit;                             // read-only: don't touch (e.g. VCS-locked)
-  Data := ReadFileBytes(FileName);
-  if Data = '' then
-    Exit;
-  Norm := NormalizeToCRLF(Data, Changed);
-  if Changed then
-    WriteFileBytes(FileName, Norm);   // IDE reads the clean CRLF file right after
+  try
+    if not IsNormalizableExt(FileName) then
+      Exit;
+    if not FileExists(FileName) then
+      Exit;                           // new/virtual file - nothing on disk yet
+    Attr := FileGetAttr(FileName);
+    if (Attr < 0) or ((Attr and faReadOnly) <> 0) then
+      Exit;                           // read-only: don't touch (e.g. VCS-locked)
+    Data := ReadFileBytes(FileName);
+    if Data = '' then
+      Exit;
+    Norm := NormalizeToCRLF(Data, Changed);
+    if Changed then
+      WriteFileBytes(FileName, Norm); // IDE reads the clean CRLF file right after
+  except
+    // normalizing must never break the caller (file open / reload)
+  end;
 end;
 
 { TLineEndingNotifier }
@@ -181,6 +198,7 @@ end;
 
 procedure InstallNormalizeLineEndings(Value: Boolean);
 begin
+  GActive := Value;
   if Value then
   begin
     if GNotifierIndex >= 0 then

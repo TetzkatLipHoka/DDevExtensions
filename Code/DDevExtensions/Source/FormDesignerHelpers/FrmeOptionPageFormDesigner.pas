@@ -53,7 +53,6 @@ type
     cbxLabelMargin: TCheckBox;
     chkRemoveExplicitProperties: TCheckBox;
     chkRemovePixelsPerInchProperties: TCheckBox;
-    chkRemovePixelsPerInchProperty: TCheckBox;
     chkRemoveTextHeightProperty: TCheckBox;
     chkFixAlphaControlsPNG: TCheckBox;
     procedure cbxActiveClick(Sender: TObject);
@@ -107,7 +106,8 @@ procedure TFrameOptionPageFormDesigner.cbxActiveClick(Sender: TObject);
 begin
   cbxLabelMargin.Enabled := cbxActive.Checked;
   chkRemoveExplicitProperties.Enabled := cbxActive.Checked;
-  chkRemovePixelsPerInchProperties.Enabled := {$IFDEF DELPHI28_UP}cbxActive.Checked{$ELSE}False;{$ENDIF};
+  chkRemovePixelsPerInchProperties.Enabled := {$IFDEF DELPHI28_UP}cbxActive.Checked{$ELSE}False{$ENDIF};
+  chkRemoveTextHeightProperty.Enabled := {$IFDEF DELPHI28_UP}cbxActive.Checked{$ELSE}False{$ENDIF};
 end;
 
 procedure TFrameOptionPageFormDesigner.SetUserData(UserData: TObject);
@@ -121,6 +121,7 @@ begin
   cbxLabelMargin.Checked := FFormDesigner.LabelMargin;
   chkRemoveExplicitProperties.Checked := FFormDesigner.RemoveExplicitProperty;
   chkRemovePixelsPerInchProperties.Checked := FFormDesigner.RemovePixelsPerInchProperty;
+  chkRemoveTextHeightProperty.Checked := FFormDesigner.RemoveTextHeightProperty;
   chkFixAlphaControlsPNG.Checked := FFormDesigner.FixAlphaControlsPNG;
 
   cbxActiveClick(cbxActive);

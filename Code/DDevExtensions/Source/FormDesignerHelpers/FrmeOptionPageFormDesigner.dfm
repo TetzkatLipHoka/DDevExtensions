@@ -1,9 +1,9 @@
 inherited FrameOptionPageFormDesigner: TFrameOptionPageFormDesigner
   Width = 372
-  Height = 210
+  Height = 189
   inherited pnlClient: TPanel
     Width = 372
-    Height = 161
+    Height = 140
     object cbxActive: TCheckBox
       Left = 8
       Top = 8
@@ -35,31 +35,23 @@ inherited FrameOptionPageFormDesigner: TFrameOptionPageFormDesigner
       Width = 321
       Height = 17
       Caption = 'Do not store TDataModule.PixelsPerInch* property in DFM'
+      TabOrder = 3
+    end
+    object chkRemoveTextHeightProperty: TCheckBox
+      Left = 24
+      Top = 93
+      Width = 271
+      Height = 17
+      Caption = 'Do not store the TextHeight property into the DFM'
       TabOrder = 4
     end
     object chkFixAlphaControlsPNG: TCheckBox
       Left = 24
-      Top = 136
+      Top = 114
       Width = 253
       Height = 17
       Caption = 'Replace TPNGGraphic (acPNG) with TPngImage'
-      TabOrder = 3
-    end
-    object chkRemovePixelsPerInchProperty: TCheckBox
-      Left = 24
-      Top = 93
-      Width = 287
-      Height = 17
-      Caption = 'Do not store the PixelsPerInch property into the DFM'
       TabOrder = 5
-    end
-    object chkRemoveTextHeightProperty: TCheckBox
-      Left = 24
-      Top = 114
-      Width = 271
-      Height = 17
-      Caption = 'Do not store the TextHeight property into the DFM'
-      TabOrder = 6
     end
   end
   inherited pnlDescription: TPanel

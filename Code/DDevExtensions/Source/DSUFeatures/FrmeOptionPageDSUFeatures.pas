@@ -173,6 +173,10 @@ var
   TStdPackageProjectContainer_ProcessAddCommand: procedure(Instance: TObject; Command: Integer);
   TStdProjectContainer_AddToProject: procedure(Instance: TObject);
   {$IFEND}
+  {$IF CompilerVersion >= 37.0} // Delphi 13+: ReplacePackageAddContain diagnostics (step 1)
+  ProcessAddCommandHook: TRedirectCode;
+  TStdPackageProjectContainer_ProcessAddCommand: procedure(Instance: TObject; const Command: UnicodeString);
+  {$IFEND}
 
 procedure InitPlugin(Unload: Boolean);
 begin
@@ -564,6 +568,79 @@ begin
 end;
 {$IFEND}
 
+{$IF CompilerVersion >= 37.0} // Delphi 13+
+{ DIAGNOSTIC (temporary, step 1 of re-enabling ReplacePackageAddContain):
+  Delphi 13 changed TStdPackageProjectContainer.ProcessAddCommand from the
+  TLocalCommand enum (the old hook replaced Command = 4 = "add contains") to
+  a command string. Before re-implementing the replacement, log every command
+  string the IDE feeds through here to learn the vocabulary. Behavior-neutral:
+  log, then call the original. }
+
+procedure DiagLog(const S: string);
+var
+  F: TextFile;
+  FileName: string;
+begin
+  try
+    FileName := AppDataDirectory + '\ProcessAddCommand.log';
+    AssignFile(F, FileName);
+    if FileExists(FileName) then
+      Append(F)
+    else
+      Rewrite(F);
+    try
+      WriteLn(F, FormatDateTime('yyyy-mm-dd hh:nn:ss', Now) + ' | ' + S);
+    finally
+      CloseFile(F);
+    end;
+  except
+    // diagnostics must never break the IDE command
+  end;
+end;
+
+procedure HookedProcessAddCommandDiag(Instance: TObject; const Command: UnicodeString);
+begin
+  if Instance <> nil then
+    DiagLog(Instance.ClassName + ' | "' + Command + '"')
+  else
+    DiagLog('nil | "' + Command + '"');
+  CodeRestore(ProcessAddCommandHook);
+  try
+    TStdPackageProjectContainer_ProcessAddCommand(Instance, Command);
+  finally
+    CodeRedirect(@TStdPackageProjectContainer_ProcessAddCommand, @HookedProcessAddCommandDiag, ProcessAddCommandHook);
+  end;
+end;
+
+procedure InstallProcessAddCommandDiagnostics;
+const
+  {$IFDEF CPUX64}
+  sProcessAddCommand = '_ZN13Pkgcontainers27TStdPackageProjectContainer17ProcessAddCommandEN6System13UnicodeStringE';
+  sPlatformName = 'Win64';
+  {$ELSE}
+  sProcessAddCommand = '@Pkgcontainers@TStdPackageProjectContainer@ProcessAddCommand$qqrx20System@UnicodeString';
+  sPlatformName = 'Win32';
+  {$ENDIF}
+var
+  Lib: THandle;
+begin
+  Lib := GetModuleHandle(delphicoreide_bpl);
+  if Lib = 0 then
+  begin
+    DiagLog('install: ' + delphicoreide_bpl + ' not loaded');
+    Exit;
+  end;
+  TStdPackageProjectContainer_ProcessAddCommand := DbgStrictGetProcAddress(Lib, PAnsiChar(sProcessAddCommand));
+  if Assigned(TStdPackageProjectContainer_ProcessAddCommand) then
+  begin
+    CodeRedirect(@TStdPackageProjectContainer_ProcessAddCommand, @HookedProcessAddCommandDiag, ProcessAddCommandHook);
+    DiagLog('install: hook active on ProcessAddCommand (' + sPlatformName + ')');
+  end
+  else
+    DiagLog('install: symbol not found: ' + sProcessAddCommand);
+end;
+{$IFEND}
+
 constructor TDSUFeaturesConfig.Create;
 begin
   if BorlandIDEServices <> nil then
@@ -578,6 +655,10 @@ begin
   FTimerStructureView.Enabled := True;
 
   inherited Create(AppDataDirectory + '\DSUFeatures.xml', 'DSUFeatures');
+
+  {$IF CompilerVersion >= 37.0} // Delphi 13+: ReplacePackageAddContain diagnostics (step 1)
+  InstallProcessAddCommandDiagnostics;
+  {$IFEND}
 end;
 
 destructor TDSUFeaturesConfig.Destroy;
@@ -586,6 +667,9 @@ begin
   UnhookFunction(DisabledGetRegionsHook);
   CodeRestore(ProcessAddCommandHook);
   CodeRestore(Package_AddProjectModuleHook);
+  {$IFEND}
+  {$IF CompilerVersion >= 37.0} // Delphi 13+: ReplacePackageAddContain diagnostics (step 1)
+  CodeRestore(ProcessAddCommandHook);
   {$IFEND}
   FTimerStructureView.Free;
   {$IF CompilerVersion <= 28.0} // XE7-, XE8 replaced DExplorer with *.chm files

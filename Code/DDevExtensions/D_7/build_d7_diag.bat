@@ -8,7 +8,7 @@ set DCU=C:\Users\TLH\AppData\Local\Temp\d7dcu_diag
 if not exist "%DCU%" mkdir "%DCU%"
 set MAD=C:\Delphi\7\TLH\Packages\madCollection
 "C:\Delphi\7\Bin\dcc32compiler.exe" -B -GD -DmadExcept DDevExtensions.dpr ^
- -U"..\Source;..\Source\CompileProgress;..\Source\ProjectSettings;..\Source\IDEMenuHandler;..\Source\ExcelExport;..\Source\UnitSelector;..\Source\Keybindings;..\Source\FileCleaner;..\Source\CompileBackup;..\Source\FormDesignerHelpers;..\Source\FileSelector;..\Source\DSUFeatures;..\Source\ComponentSelector;..\Source\OldPalette;..\Source\StartParameterManager;..\Source\StartParameterTeam;..\Source\Editor;..\Source\CompilerEnhancements;..\..\..\CompileInterceptor\Source;..\..\..\Shared;..\..\..\Shared\PascalParser;..\..\..\Shared\IDE;..\..\..\Shared\IDE\Options;..\..\..\Shared\Xml;%MAD%\madExcept\Delphi 7;%MAD%\madBasic\Delphi 7;%MAD%\madDisAsm\Delphi 7;C:\Delphi\7\Lib;C:\Delphi\7\Source\ToolsAPI" ^
+ -U"..\Source;..\Source\CompileProgress;..\Source\ProjectSettings;..\Source\IDEMenuHandler;..\Source\ExcelExport;..\Source\Keybindings;..\Source\FileCleaner;..\Source\CompileBackup;..\Source\FormDesignerHelpers;..\Source\FileSelector;..\Source\DSUFeatures;..\Source\ComponentSelector;..\Source\OldPalette;..\Source\StartParameterManager;..\Source\StartParameterTeam;..\Source\Editor;..\Source\CompilerEnhancements;..\..\..\CompileInterceptor\Source;..\..\..\Shared;..\..\..\Shared\PascalParser;..\..\..\Shared\IDE;..\..\..\Shared\IDE\Options;..\..\..\Shared\Xml;%MAD%\madExcept\Delphi 7;%MAD%\madBasic\Delphi 7;%MAD%\madDisAsm\Delphi 7;C:\Delphi\7\Lib;C:\Delphi\7\Source\ToolsAPI" ^
  -I"..\Source;..\jedi" ^
  -LUrtl -LUvcl -LUdesignide ^
  -N"%DCU%"

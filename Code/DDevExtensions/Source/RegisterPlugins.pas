@@ -31,7 +31,7 @@ uses
   {$IFDEF INCLUDE_STARTPARAMETERTEAM}
   FrmeOptionPageStartParameterTeam, // XE2 made the parameter configuration-aware
   {$ENDIF INCLUDE_STARTPARAMETERTEAM}
-  FrmeOptionPageUnitSelector, FrmeOptionPageDSUFeatures, ComponentSelector, StrucViewSearch,
+  FrmeOptionPageDSUFeatures, ComponentSelector, StrucViewSearch,
   {$IF CompilerVersion <= 32.0} // 10.2 Tokyo-
   FrmeOptionPageOldPalette,
   {$IFEND}
@@ -91,11 +91,8 @@ begin
       RegisterLateLoader(FrmeOptionPageCompilerEnhancements.InitPlugin);
     {$ENDIF}
 
-    {$IFDEF INCLUDE_UNITSELECTOR}
-    if DisabledPlugins.IndexOf('UnitSelector') = -1 then
-      RegisterLateLoader(FrmeOptionPageUnitSelector.InitPlugin);
-    {$ENDIF}
-
+    // UnitSelector removed 2026-07: FrmUnitSelector never made it into this
+    // source line and CnWizards covers the feature
     {$IFDEF INCLUDE_FILECLEANER}
     if DisabledPlugins.IndexOf('FileCleaner') = -1 then
       RegisterLateLoader(FrmeOptionPageFileCleaner.InitPlugin);

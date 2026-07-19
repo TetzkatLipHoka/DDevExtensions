@@ -34,7 +34,6 @@ uses
   FrmeOptionPageCompilerProgress in '..\Source\CompileProgress\FrmeOptionPageCompilerProgress.pas' {FrameOptionPageCompilerProgress: TFrame},
   CtrlUtils in '..\Source\CtrlUtils.pas',
   FrmExcelExport in '..\Source\ExcelExport\FrmExcelExport.pas' {FormExcelExport},
-  FrmeOptionPageUnitSelector in '..\Source\UnitSelector\FrmeOptionPageUnitSelector.pas' {FrameOptionPageUnitSelector: TFrame},
   FrmeOptionPageKeybindings in '..\Source\Keybindings\FrmeOptionPageKeybindings.pas' {FrameOptionPageKeybindings: TFrame},
   PluginConfig in '..\Source\PluginConfig.pas',
   FrmeOptionPageFileCleaner in '..\Source\FileCleaner\FrmeOptionPageFileCleaner.pas' {FrameOptionPageFileCleaner: TFrame},

@@ -12,7 +12,7 @@ cd /d T:\Code\DDevExtensions\D_7
 set DCU=C:\Users\TLH\AppData\Local\Temp\d7dcu
 if not exist "%DCU%" mkdir "%DCU%"
 "C:\Delphi\7\Bin\dcc32compiler.exe" -B DDevExtensions.dpr ^
- -U"..\Source;..\Source\CompileProgress;..\Source\ProjectSettings;..\Source\IDEMenuHandler;..\Source\ExcelExport;..\Source\UnitSelector;..\Source\Keybindings;..\Source\FileCleaner;..\Source\CompileBackup;..\Source\FormDesignerHelpers;..\Source\FileSelector;..\Source\DSUFeatures;..\Source\ComponentSelector;..\Source\OldPalette;..\Source\StartParameterManager;..\Source\StartParameterTeam;..\Source\Editor;..\..\..\CompileInterceptor\Source;..\..\..\Shared;..\..\..\Shared\PascalParser;..\..\..\Shared\IDE;..\..\..\Shared\IDE\Options;..\..\..\Shared\Xml;C:\Delphi\7\Lib;C:\Delphi\7\Source\ToolsAPI" ^
+ -U"..\Source;..\Source\CompileProgress;..\Source\ProjectSettings;..\Source\IDEMenuHandler;..\Source\ExcelExport;..\Source\Keybindings;..\Source\FileCleaner;..\Source\CompileBackup;..\Source\FormDesignerHelpers;..\Source\FileSelector;..\Source\DSUFeatures;..\Source\ComponentSelector;..\Source\OldPalette;..\Source\StartParameterManager;..\Source\StartParameterTeam;..\Source\Editor;..\..\..\CompileInterceptor\Source;..\..\..\Shared;..\..\..\Shared\PascalParser;..\..\..\Shared\IDE;..\..\..\Shared\IDE\Options;..\..\..\Shared\Xml;C:\Delphi\7\Lib;C:\Delphi\7\Source\ToolsAPI" ^
  -I"..\Source;..\jedi" ^
  -LUrtl -LUvcl -LUdesignide ^
  -N"%DCU%"

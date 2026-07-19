@@ -1,4 +1,4 @@
-﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{13bb5c7c-bee9-44e9-863a-a43268dc0228}</ProjectGuid>
         <MainSource>DDevExtensions.dpr</MainSource>
@@ -593,10 +593,6 @@ $(PreBuildEvent)]]></PreBuildEvent>
         <DCCReference Include="..\Source\CtrlUtils.pas"/>
         <DCCReference Include="..\Source\ExcelExport\FrmExcelExport.pas">
             <Form>FormExcelExport</Form>
-        </DCCReference>
-        <DCCReference Include="..\Source\UnitSelector\FrmeOptionPageUnitSelector.pas">
-            <Form>FrameOptionPageUnitSelector</Form>
-            <DesignClass>TFrame</DesignClass>
         </DCCReference>
         <DCCReference Include="..\Source\Keybindings\FrmeOptionPageKeybindings.pas">
             <Form>FrameOptionPageKeybindings</Form>

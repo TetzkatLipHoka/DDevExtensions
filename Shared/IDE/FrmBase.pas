@@ -31,6 +31,7 @@ type
     { Public-Deklarationen }
     constructor Create(AOwner: TComponent); override;
     procedure FormCreate(Sender: TObject);
+    procedure ApplyIDETheme;
     function ShowModal: Integer; override;
   end;
 
@@ -103,6 +104,11 @@ begin
   end;
   Font.Name := {$IFDEF UNICODE}UTF8ToString{$ENDIF}(DefFontData.Name);
   Font.Height := DefFontData.Height;
+
+  { In the constructor (not in the OnCreate event): several descendants assign
+    their own OnCreate handler without calling inherited, which silently
+    skipped the theming for those dialogs (e.g. the options dialog). }
+  ApplyIDETheme;
 end;
 
 procedure TFormBase.DoClose(var Action: TCloseAction);
@@ -141,6 +147,12 @@ begin
 end;
 
 procedure TFormBase.FormCreate(Sender: TObject);
+begin
+  // theming happens in Create/ApplyIDETheme - descendants may replace this
+  // handler without calling inherited
+end;
+
+procedure TFormBase.ApplyIDETheme;
 {$IF CompilerVersion >= 34.0} // 10.4+: TControl.StyleName does not exist earlier (10 Seattle: E2003)
 var
   sName: string;
@@ -167,6 +179,22 @@ begin
     ThemingServices.RegisterFormClass(TCustomFormClass(ClassType));
     ThemingServices.ApplyTheme(Self);
   end;
+  {$IFDEF THEMEDEBUG}
+  // temporary diagnostics: DDevExtensions_ThemeDebug.log in %TEMP%
+  with TStringList.Create do
+  try
+    if FileExists(GetEnvironmentVariable('TEMP') + '\DDevExtensions_ThemeDebug.log') then
+      LoadFromFile(GetEnvironmentVariable('TEMP') + '\DDevExtensions_ThemeDebug.log');
+    Add(Format('%s Form=%s Supports250=%s', [DateTimeToStr(Now), ClassName,
+      BoolToStr(Supports(BorlandIDEServices, IOTAIDEThemingServices250, ThemingServices), True)]));
+    if ThemingServices <> nil then
+      Add(Format('  Enabled=%s ActiveTheme="%s" Color=%d',
+        [BoolToStr(ThemingServices.IDEThemingEnabled, True), ThemingServices.ActiveTheme, Integer(Color)]));
+    SaveToFile(GetEnvironmentVariable('TEMP') + '\DDevExtensions_ThemeDebug.log');
+  finally
+    Free;
+  end;
+  {$ENDIF}
   {$IFEND}
   {$IFEND}
 end;

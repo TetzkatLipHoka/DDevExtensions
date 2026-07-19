@@ -186,8 +186,7 @@ begin
      ThemingServices.IDEThemingEnabled then
   begin
     ThemingServices.RegisterFormClass(TCustomFormClass(ClassType));
-    ThemingServices.ApplyTheme(Self);
-    ThemeFixupControls(Self);
+    ThemeFixupControls(Self); // runs ApplyTheme + the manual color fixups
   end;
   {$IFDEF THEMEDEBUG}
   // temporary diagnostics: DDevExtensions_ThemeDebug.log in %TEMP%
@@ -240,6 +239,7 @@ end;
 
 procedure TFormBase.ThemeFixupControls(AParent: TWinControl);
 var
+  ThemingServices: IOTAIDEThemingServices;
   Style: TCustomStyleServices;
 
   procedure Walk(Parent: TWinControl);
@@ -253,11 +253,14 @@ var
       // ApplyTheme leaves controls that default to clWindow (and do not
       // inherit ParentColor) with a light client area
       if (C is TCustomEdit) or (C is TCustomComboBox) or (C is TCustomListBox) or
-         (C is TCustomListView) or (C is TCustomTreeView) then
+         (C is TCustomListView) or (C is TCustomTreeView) or (C is THotKey) then
       begin
         TControlAccess(C).Color := Style.GetSystemColor(clWindow);
         TControlAccess(C).Font.Color := Style.GetSystemColor(clWindowText);
-      end;
+      end
+      // belt and braces for labels the engine's ApplyTheme leaves black
+      else if (C is TCustomLabel) or (C is TCustomStaticText) then
+        TControlAccess(C).Font.Color := Style.GetSystemColor(clWindowText);
       if C is TCustomTreeView then
         if not Assigned(TTreeViewAccess(C).OnCustomDrawItem) then
           TTreeViewAccess(C).OnCustomDrawItem := ThemeTreeCustomDrawItem;
@@ -267,8 +270,16 @@ var
   end;
 
 begin
-  if GetIDEStyle(Style) then
-    Walk(AParent);
+  if not (Supports(BorlandIDEServices, IOTAIDEThemingServices, ThemingServices) and
+          ThemingServices.IDEThemingEnabled) then
+    Exit;
+  Style := ThemingServices.StyleServices;
+  if Style = nil then
+    Exit;
+  // the engine's recursive pass (labels, panels, the frame/form itself) -
+  // option page frames are created after the dialog's own ApplyTheme ran
+  ThemingServices.ApplyTheme(AParent);
+  Walk(AParent);
 end;
 {$IFEND}
 

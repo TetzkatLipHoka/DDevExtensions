@@ -41,7 +41,8 @@ procedure InstallNormalizeLineEndings(Value: Boolean);
 function NormalizeLineEndingsActive: Boolean;
 // Normalize FileName on disk to CRLF (safe no-op if it is not a source file,
 // is read-only, is already CRLF, or cannot be accessed). Fully self-guarding.
-procedure NormalizeDiskFile(const FileName: string);
+// Returns True if the file was actually rewritten.
+function NormalizeDiskFile(const FileName: string): Boolean;
 
 implementation
 
@@ -149,12 +150,13 @@ begin
   end;
 end;
 
-procedure NormalizeDiskFile(const FileName: string);
+function NormalizeDiskFile(const FileName: string): Boolean;
 var
   Attr: Integer;
   Data, Norm: AnsiString;
   Changed: Boolean;
 begin
+  Result := False;
   try
     if not IsNormalizableExt(FileName) then
       Exit;
@@ -168,7 +170,10 @@ begin
       Exit;
     Norm := NormalizeToCRLF(Data, Changed);
     if Changed then
+    begin
       WriteFileBytes(FileName, Norm); // IDE reads the clean CRLF file right after
+      Result := True;
+    end;
   except
     // normalizing must never break the caller (file open / reload)
   end;
@@ -176,15 +181,51 @@ end;
 
 { TLineEndingNotifier }
 
+var
+  GBusy: Boolean;
+
+{$IF CompilerVersion >= 30.0}
+{ ofnFileOpened path: a project-open desktop restore opens its source files
+  with ONLY ofnFileOpened (no ofnFileOpening - confirmed via notification log),
+  so the on-opening disk normalize never sees them and the editor loads the LF
+  buffer. Normalize the disk here and, if it was actually still LF, reload the
+  module so the buffer re-reads the clean CRLF file (which also re-detects the
+  CRLF end-of-line style). For a normal open the file was already normalized on
+  ofnFileOpening, so this is a no-op (no reload). Refresh exists from Delphi 10
+  Seattle (CompilerVersion 30) on; older IDEs keep the on-opening coverage. }
+procedure ReloadIfNormalized(const FileName: string);
+var
+  Module: IOTAModule;
+begin
+  if GBusy then
+    Exit;
+  if not NormalizeDiskFile(FileName) then
+    Exit; // already clean (normal open) - nothing to reload
+  GBusy := True;
+  try
+    try
+      Module := (BorlandIDEServices as IOTAModuleServices).FindModule(FileName);
+      if Module <> nil then
+        Module.Refresh(True); // reload the now-CRLF file from disk
+    except
+      // a reload that fails mid-restore must not break the project open
+    end;
+  finally
+    GBusy := False;
+  end;
+end;
+{$IFEND}
+
 procedure TLineEndingNotifier.FileNotification(NotifyCode: TOTAFileNotification;
   const FileName: string; var Cancel: Boolean);
 begin
-  if NotifyCode <> ofnFileOpening then
-    Exit;
-  try
-    NormalizeDiskFile(FileName);
-  except
-    // normalizing must never break opening the file
+  case NotifyCode of
+    ofnFileOpening:
+      NormalizeDiskFile(FileName); // normal open: clean the file before it loads
+    {$IF CompilerVersion >= 30.0}
+    ofnFileOpened:
+      ReloadIfNormalized(FileName); // project-restore files arrive only here
+    {$IFEND}
   end;
 end;
 

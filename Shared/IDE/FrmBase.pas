@@ -25,8 +25,9 @@ type
   private
     { Private-Deklarationen }
     {$IF (CompilerVersion >= 32.0) and (CompilerVersion < 34.0)}
-    procedure ThemeTreeCustomDrawItem(Sender: TCustomTreeView; Node: TTreeNode;
-      State: TCustomDrawState; var DefaultDraw: Boolean);
+    procedure ThemeTreeAdvancedCustomDrawItem(Sender: TCustomTreeView;
+      Node: TTreeNode; State: TCustomDrawState; Stage: TCustomDrawStage;
+      var PaintImages, DefaultDraw: Boolean);
     {$IFEND}
   protected
     procedure DoClose(var Action: TCloseAction); override;
@@ -227,21 +228,29 @@ begin
   end;
 end;
 
-procedure TFormBase.ThemeTreeCustomDrawItem(Sender: TCustomTreeView; Node: TTreeNode;
-  State: TCustomDrawState; var DefaultDraw: Boolean);
+procedure TFormBase.ThemeTreeAdvancedCustomDrawItem(Sender: TCustomTreeView;
+  Node: TTreeNode; State: TCustomDrawState; Stage: TCustomDrawStage;
+  var PaintImages, DefaultDraw: Boolean);
 var
   Style: TCustomStyleServices;
+  R: TRect;
 begin
-  { The selected item's text stayed black: with the Explorer window theme the
-    tree control ignores the custom draw text color for selected items, so the
-    Explorer theme is removed in ThemeFixupControls and the selection colors
-    are provided here. }
-  if (cdsSelected in State) and GetIDEStyle(Style) then
-  begin
-    Sender.Canvas.Brush.Color := Style.GetSystemColor(clHighlight);
-    Sender.Canvas.Font.Color := Style.GetSystemColor(clHighlightText);
-  end;
+  { The tree control ignores custom draw text colors for the SELECTED item
+    (both with and without the Explorer window theme), so the item is
+    repainted here after the control's own item paint. }
   DefaultDraw := True;
+  if (Stage = cdPostPaint) and (cdsSelected in State) and GetIDEStyle(Style) then
+  begin
+    R := Node.DisplayRect(True);
+    Sender.Canvas.Brush.Style := bsSolid;
+    Sender.Canvas.Brush.Color := Style.GetSystemColor(clHighlight);
+    Sender.Canvas.FillRect(R);
+    Sender.Canvas.Font.Color := Style.GetSystemColor(clHighlightText);
+    Sender.Canvas.Brush.Style := bsClear;
+    Sender.Canvas.TextOut(R.Left + 2,
+      R.Top + (R.Bottom - R.Top - Sender.Canvas.TextHeight(Node.Text)) div 2, Node.Text);
+    Sender.Canvas.Brush.Style := bsSolid;
+  end;
 end;
 
 procedure TFormBase.ThemeFixupControls(AParent: TWinControl);
@@ -272,10 +281,11 @@ var
         TControlAccess(C).Font.Color := Style.GetSystemColor(clWindowText);
       if C is TCustomTreeView then
       begin
-        // the Explorer theme ignores custom draw colors for selected items
+        // classic selection (the Explorer theme paints its own selection
+        // visuals under/around our post-paint rectangle)
         SetWindowTheme(TWinControl(C).Handle, '', '');
-        if not Assigned(TTreeViewAccess(C).OnCustomDrawItem) then
-          TTreeViewAccess(C).OnCustomDrawItem := ThemeTreeCustomDrawItem;
+        if not Assigned(TTreeViewAccess(C).OnAdvancedCustomDrawItem) then
+          TTreeViewAccess(C).OnAdvancedCustomDrawItem := ThemeTreeAdvancedCustomDrawItem;
       end;
       if C is TWinControl then
         Walk(TWinControl(C));

@@ -321,6 +321,212 @@ end;}
 
 {-------------------------------------------------------------------------------------------------}
 
+{$IFDEF CPUX64}
+// ---------------------------------------------------------------------------
+//  Delphi 13 x64 — diagnostic-first (step 1). See scratchpad alphasort_x64_RE.md.
+//  The x86 byte-pattern patcher does not apply on x64. Here we only install a
+//  behavior-neutral pass-through on the Symbols::TTableIterator constructor
+//  (imported by delphicoreide370 from designide370) and LOG the real x64 object
+//  layouts, scoped via the return address to calls coming from
+//  TPascalClassCompleter.Complete only. Goal: derive the true field offsets
+//  (TSymbolTable.FCount/FSymbolList, TBaseSymbol.Next, TMethodSignature.*)
+//  before the real reordering hook is written. Patches the IAT slot (full
+//  64-bit pointer) so there is no rel32 / near-trampoline concern.
+// ---------------------------------------------------------------------------
+const
+  sDsgnTableIteratorCtor = '_ZN7Symbols14TTableIteratorC3EPNS_12TSymbolTableE';
+
+type
+  TIteratorCtorProc = function(AClass: Pointer; AllocFlag: NativeInt; ATable: Pointer): Pointer;
+
+var
+  DiagCtorIatSlot: PPointer;       // patched IAT slot in delphicoreide370
+  DiagOrgCtor: Pointer;            // original designide ctor
+  DiagCompleteLo, DiagCompleteHi: NativeUInt;
+  DiagLogged: Integer;            // throttle: only the first few completion calls
+
+procedure DiagLog(const S: string);
+var
+  F: TextFile;
+  Dir, FileName: string;
+begin
+  try
+    Dir := GetEnvironmentVariable('APPDATA') + '\DDevExtensions';
+    FileName := Dir + '\AlphaSort.log';
+    AssignFile(F, FileName);
+    if FileExists(FileName) then Append(F) else Rewrite(F);
+    try
+      WriteLn(F, S);
+    finally
+      CloseFile(F);
+    end;
+  except
+    // diagnostics must never break the IDE
+  end;
+end;
+
+function DiagHexDump(P: Pointer; Len: Integer): string;
+var
+  i: Integer;
+  b: PByte;
+  line: string;
+begin
+  Result := '';
+  b := PByte(P);
+  i := 0;
+  line := '';
+  while i < Len do
+  begin
+    if (i and 15) = 0 then
+    begin
+      if i > 0 then Result := Result + line + sLineBreak;
+      line := Format('  +%3.3x: ', [i]);
+    end;
+    try
+      line := line + IntToHex(b[i], 2) + ' ';
+    except
+      line := line + '?? ';
+    end;
+    Inc(i);
+  end;
+  Result := Result + line;
+end;
+
+function DiagIteratorCtor(AClass: Pointer; AllocFlag: NativeInt; ATable: Pointer): Pointer;
+var
+  Org: TIteratorCtorProc;
+  ra: NativeUInt;
+begin
+  Org := TIteratorCtorProc(DiagOrgCtor);
+  Result := Org(AClass, AllocFlag, ATable);   // behavior-neutral: real ctor runs unchanged
+
+  ra := NativeUInt(ReturnAddress);
+  if (DiagLogged < 4) and (ra >= DiagCompleteLo) and (ra < DiagCompleteHi) then
+  begin
+    Inc(DiagLogged);
+    try
+      DiagLog('--- TTableIterator ctor from Complete, call #' + IntToStr(DiagLogged) + ' ---');
+      DiagLog(Format('  ret=%p AClass=%p AllocFlag=%d ATable=%p Iterator=%p',
+        [Pointer(ra), AClass, AllocFlag, ATable, Result]));
+      if ATable <> nil then
+      begin
+        DiagLog('  SymbolTable dump (0x140 bytes):');
+        DiagLog(DiagHexDump(ATable, $140));
+      end;
+      if Result <> nil then
+      begin
+        DiagLog('  Iterator dump (0x40 bytes):');
+        DiagLog(DiagHexDump(Result, $40));
+      end;
+    except
+      DiagLog('  (exception during dump)');
+    end;
+  end;
+end;
+
+function DiagFindCtorIatSlot(CompleteP, RealCtor: Pointer): PPointer;
+var
+  p, limit, t: PByte;
+  slot: PPointer;
+begin
+  Result := nil;
+  p := PByte(CompleteP);
+  limit := p + $1200;
+  while NativeUInt(p) < NativeUInt(limit) do
+  begin
+    if p^ = $E8 then
+    begin
+      try
+        t := PByte(GetCallTargetAddress(p));   // E8 direct target = import stub
+        if (t <> nil) and (t[0] = $FF) and (t[1] = $25) then
+        begin
+          slot := PPointer(t + 6 + PInteger(t + 2)^);   // FF25 -> *[rip+disp32] = IAT slot
+          if slot^ = RealCtor then
+          begin
+            Result := slot;
+            Exit;
+          end;
+        end;
+      except
+        // mis-aligned E8 operand pointing at unmapped memory - ignore
+      end;
+    end;
+    Inc(p);
+  end;
+end;
+
+procedure InstallAlphaSortDiag(Value: Boolean);
+var
+  hCore, hDsgn: THandle;
+  RealCtor, CompleteP: Pointer;
+  OldProt: DWORD;
+begin
+  if Value then
+  begin
+    if DiagCtorIatSlot <> nil then Exit;   // already installed
+
+    hCore := GetModuleHandle(delphicoreide_bpl);
+    hDsgn := GetModuleHandle(designide_bpl);
+    if (hCore = 0) or (hDsgn = 0) then
+    begin
+      DiagLog('install: BPL not loaded (core=' + IntToStr(hCore) + ' dsgn=' + IntToStr(hDsgn) + ')');
+      Exit;
+    end;
+
+    RealCtor := GetProcAddress(hDsgn, sDsgnTableIteratorCtor);
+    if RealCtor = nil then
+    begin
+      DiagLog('install: ctor symbol not found in designide');
+      Exit;
+    end;
+
+    CompleteP := GetActualAddr(@TPascalClassCompleter_Complete);
+    if CompleteP = nil then
+    begin
+      DiagLog('install: Complete not resolved');
+      Exit;
+    end;
+    DiagCompleteLo := NativeUInt(CompleteP);
+    DiagCompleteHi := DiagCompleteLo + $1200;
+
+    DiagCtorIatSlot := DiagFindCtorIatSlot(CompleteP, RealCtor);
+    if DiagCtorIatSlot = nil then
+    begin
+      DiagLog('install: ctor IAT slot not found in Complete');
+      Exit;
+    end;
+
+    DiagOrgCtor := RealCtor;
+    DiagLogged := 0;
+    if VirtualProtect(DiagCtorIatSlot, SizeOf(Pointer), PAGE_READWRITE, OldProt) then
+    begin
+      DiagCtorIatSlot^ := @DiagIteratorCtor;
+      VirtualProtect(DiagCtorIatSlot, SizeOf(Pointer), OldProt, OldProt);
+      DiagLog(Format('install: hook active, IAT slot=%p, realCtor=%p, Complete=%p',
+        [DiagCtorIatSlot, RealCtor, CompleteP]));
+    end
+    else
+    begin
+      DiagLog('install: VirtualProtect failed');
+      DiagCtorIatSlot := nil;
+    end;
+  end
+  else
+  begin
+    if DiagCtorIatSlot <> nil then
+    begin
+      if VirtualProtect(DiagCtorIatSlot, SizeOf(Pointer), PAGE_READWRITE, OldProt) then
+      begin
+        DiagCtorIatSlot^ := DiagOrgCtor;
+        VirtualProtect(DiagCtorIatSlot, SizeOf(Pointer), OldProt, OldProt);
+        DiagLog('uninstall: IAT slot restored');
+      end;
+      DiagCtorIatSlot := nil;
+    end;
+  end;
+end;
+{$ENDIF CPUX64}
+
 procedure InstallDisableAlphaSortClassCompletion(Value: Boolean);
 {$IFNDEF CPUX64}
 const
@@ -432,7 +638,8 @@ begin
 end;
 {$ELSE}
 begin
-  // Win64: x86 byte-pattern matching is not applicable, feature not available
+  // Win64 (Delphi 13): diagnostic-first step 1 — see the CPUX64 block above.
+  InstallAlphaSortDiag(Value);
 end;
 {$ENDIF ~CPUX64}
 

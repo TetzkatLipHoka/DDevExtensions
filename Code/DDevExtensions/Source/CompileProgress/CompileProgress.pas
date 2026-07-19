@@ -26,6 +26,12 @@ type
     FCompileInterceptorId: Integer;
     FIDENotifier: TIDENotifier;
     FPasFiles: TStrings;
+    {$IF CompilerVersion >= 21.0} // Delphi 2010+
+    FGroupRunDepth: Integer;
+    FGroupTotalFiles: Integer;
+    FGroupCompiledBase: Integer;
+    FGroupCurrentExpected: Integer;
+    {$IFEND}
     {$IF CompilerVersion < 36.0}
     FReleaseCompilerUnitCache: Boolean;
     FReleaseCompilerUnitCacheHigh: Boolean;
@@ -47,6 +53,11 @@ type
     {$IFEND}
     procedure SetAskCompileFromDiffProject(const Value: Boolean);
     procedure UpdateInMainThread;
+    {$IF CompilerVersion >= 21.0} // Delphi 2010+
+    procedure BeginActiveCompileRun;
+    procedure BeginGroupCompileRun;
+    procedure EndCompileRun;
+    {$IFEND}
     {$IF CompilerVersion < 36.0}
     procedure SetReleaseCompilerUnitCache(const Value: Boolean);
     procedure SetReleaseCompilerUnitCacheHigh(const Value: Boolean);
@@ -201,7 +212,37 @@ procedure HookedProjectGroupCompileActive;
 function CallOrgProjectGroupCompileActive(Instance: TObject; CompileMode: TCompileMode; Wait: Boolean): Boolean;
 begin
   { Compile/Build/Check/... }
-  Result := OrgCallProjectGroupCompileActive(Instance, CompileMode, Wait);
+  if GlobalCompileProgress <> nil then
+    GlobalCompileProgress.BeginActiveCompileRun; // active project + its dependencies
+  try
+    Result := OrgCallProjectGroupCompileActive(Instance, CompileMode, Wait);
+  finally
+    if GlobalCompileProgress <> nil then
+      GlobalCompileProgress.EndCompileRun;
+  end;
+end;
+
+type
+  { Delphi 10 Seattle+ pass the project folder container, older versions do not }
+  TProjectGroupCompileAllFunc = function(Instance: TObject; CompileMode: TCompileMode; Wait: Boolean
+    {$IF CompilerVersion >= 30.0}; const ItemContainer: IInterface{$IFEND}): Boolean;
+
+var
+  OrgProjectGroupCompileAll, OrgCallProjectGroupCompileAll: TProjectGroupCompileAllFunc;
+
+function HookedProjectGroupCompileAll(Instance: TObject; CompileMode: TCompileMode; Wait: Boolean
+  {$IF CompilerVersion >= 30.0}; const ItemContainer: IInterface{$IFEND}): Boolean;
+begin
+  { Compile All/Build All: scale the progress bar over all projects of the group }
+  if GlobalCompileProgress <> nil then
+    GlobalCompileProgress.BeginGroupCompileRun;
+  try
+    Result := OrgCallProjectGroupCompileAll(Instance, CompileMode, Wait
+      {$IF CompilerVersion >= 30.0}, ItemContainer{$IFEND});
+  finally
+    if GlobalCompileProgress <> nil then
+      GlobalCompileProgress.EndCompileRun;
+  end;
 end;
 {$ELSEIF CompilerVersion >= 20.0} // Delphi 2009
 var
@@ -218,25 +259,24 @@ end;
 {$IFEND}
 
 {$IF CompilerVersion >= 20.0} // 2009+ (uses OTA project dependencies and IDE hooks not available before)
-function CompileActiveProject(Instance: TObject; CompileMode: TCompileMode; Wait: Boolean): Boolean;
-
-  procedure CollectDependencies(const Dependencies: IOTAProjectGroupProjectDependencies;
-    const DependentProjects: TInterfaceList; const Project: IOTAProject);
-  var
-    List: IOTAProjectDependenciesList;
-    Prj: IOTAProject;
-    I: Integer;
+procedure CollectDependencies(const Dependencies: IOTAProjectGroupProjectDependencies;
+  const DependentProjects: TInterfaceList; const Project: IOTAProject);
+var
+  List: IOTAProjectDependenciesList;
+  Prj: IOTAProject;
+  I: Integer;
+begin
+  DependentProjects.Add(Project);
+  List := Dependencies.GetProjectDependencies(Project);
+  for I := 0 to List.ProjectCount - 1 do
   begin
-    DependentProjects.Add(Project);
-    List := Dependencies.GetProjectDependencies(Project);
-    for I := 0 to List.ProjectCount - 1 do
-    begin
-      Prj := List.Projects[I];
-      if DependentProjects.IndexOf(Prj) = -1 then
-        CollectDependencies(Dependencies, DependentProjects, Prj);
-    end;
+    Prj := List.Projects[I];
+    if DependentProjects.IndexOf(Prj) = -1 then
+      CollectDependencies(Dependencies, DependentProjects, Prj);
   end;
+end;
 
+function CompileActiveProject(Instance: TObject; CompileMode: TCompileMode; Wait: Boolean): Boolean;
 const
   sOptAutoCloseProgressDlg = 'AutoCloseProgressDlg';
 var
@@ -427,10 +467,16 @@ const
   {$IFNDEF CPUX64}
   StartCompileSymbol = '@Comprgrs@TProgressForm@StartCompile$qqrv';
   ProjectGroupCompileActiveSymbol = '@Projectgroup@TProjectGroup@CompileActive$qqr21Compintf@TCompileModeo';
+  {$IF CompilerVersion >= 30.0} // 10 Seattle+ (verified 10 Seattle .. 13.1)
+  ProjectGroupCompileAllSymbol = '@Projectgroup@TProjectGroup@CompileAll$qqr21Compintf@TCompileModeo66System@%DelphiInterface$39Projectintf@ICustomProjectItemContainer%';
+  {$ELSE} // Delphi 2010
+  ProjectGroupCompileAllSymbol = '@Projectgroup@TProjectGroup@CompileAll$qqr21Compintf@TCompileModeo';
+  {$IFEND}
   {$ENDIF}
   {$IFDEF CPUX64}
   StartCompileSymbol = '_ZN8Comprgrs13TProgressForm12StartCompileEv';
   ProjectGroupCompileActiveSymbol = '_ZN12Projectgroup13TProjectGroup13CompileActiveEN8Compintf12TCompileModeEb';
+  ProjectGroupCompileAllSymbol = '_ZN12Projectgroup13TProjectGroup10CompileAllEN8Compintf12TCompileModeEbN6System15DelphiInterfaceIN11Projectintf27ICustomProjectItemContainerEEE';
   {$ENDIF}
 var
   Ctx: TRttiContext;
@@ -451,6 +497,15 @@ begin
     if Assigned(OrgProjectGroupCompileActive) then
       @OrgCallProjectGroupCompileActive := RedirectOrgCall(@OrgProjectGroupCompileActive, @HookedProjectGroupCompileActive);
 
+    {$IF CompilerVersion >= 30.0}
+    @OrgProjectGroupCompileAll := DbgStrictGetProcAddress(coreideLib, ProjectGroupCompileAllSymbol);
+    {$ELSE}
+    // Delphi 2010: signature not verified against this IDE - probe without the debug Assert
+    @OrgProjectGroupCompileAll := GetProcAddress(coreideLib, ProjectGroupCompileAllSymbol);
+    {$IFEND}
+    if Assigned(OrgProjectGroupCompileAll) then
+      @OrgCallProjectGroupCompileAll := RedirectOrgCall(@OrgProjectGroupCompileAll, @HookedProjectGroupCompileAll);
+
     { Get "TAppBuilder.Compile" method address }
     Ctx := TRttiContext.Create;
     try
@@ -469,6 +524,7 @@ begin
   begin
     RestoreOrgCall(@OrgStartCompile, @OrgCallStartCompile);
     RestoreOrgCall(@OrgProjectGroupCompileActive, @OrgCallProjectGroupCompileActive);
+    RestoreOrgCall(@OrgProjectGroupCompileAll, @OrgCallProjectGroupCompileAll);
     GlobalCompileProgress.Free;
   end;
 end;
@@ -638,12 +694,101 @@ begin
   end;
 end;
 
+{$IF CompilerVersion >= 21.0} // Delphi 2010+
+function CountProjectPasFiles(const Project: IOTAProject): Integer;
+var
+  I: Integer;
+begin
+  Result := 0;
+  if Project = nil then
+    Exit;
+  for I := 0 to Project.GetModuleCount - 1 do
+    if AnsiLowerCase(ExtractFileExt(Project.GetModule(I).FileName)) = '.pas' then
+      Inc(Result);
+end;
+
+procedure TCompileProgress.BeginActiveCompileRun;
+var
+  ModuleServices: IOTAModuleServices;
+  Dependencies: IOTAProjectGroupProjectDependencies;
+  DependentProjects: TInterfaceList;
+  Project: IOTAProject;
+  Total, I: Integer;
+begin
+  Inc(FGroupRunDepth);
+  if FGroupRunDepth > 1 then
+    Exit; // nested compile: keep the outer run's numbers
+  FGroupCompiledBase := 0;
+  FGroupCurrentExpected := 0;
+  Total := 0;
+  try
+    Project := GetActiveProject;
+    if Project <> nil then
+    begin
+      ModuleServices := BorlandIDEServices as IOTAModuleServices;
+      DependentProjects := TInterfaceList.Create;
+      try
+        { The IDE also compiles the projects the active project depends on }
+        if Supports(ModuleServices.GetMainProjectGroup, IOTAProjectGroupProjectDependencies, Dependencies) then
+          CollectDependencies(Dependencies, DependentProjects, Project)
+        else
+          DependentProjects.Add(Project);
+        for I := 0 to DependentProjects.Count - 1 do
+          Inc(Total, CountProjectPasFiles(DependentProjects[I] as IOTAProject));
+      finally
+        DependentProjects.Free;
+      end;
+    end;
+  except
+    Total := 0; // fall back to per-project progress
+  end;
+  FGroupTotalFiles := Total;
+end;
+
+procedure TCompileProgress.BeginGroupCompileRun;
+var
+  ProjectGroup: IOTAProjectGroup;
+  Total, I: Integer;
+begin
+  Inc(FGroupRunDepth);
+  if FGroupRunDepth > 1 then
+    Exit; // nested compile: keep the outer run's numbers
+  FGroupCompiledBase := 0;
+  FGroupCurrentExpected := 0;
+  Total := 0;
+  try
+    ProjectGroup := (BorlandIDEServices as IOTAModuleServices).GetMainProjectGroup;
+    if ProjectGroup <> nil then
+      for I := 0 to ProjectGroup.ProjectCount - 1 do
+        Inc(Total, CountProjectPasFiles(ProjectGroup.Projects[I]));
+  except
+    Total := 0; // fall back to per-project progress
+  end;
+  FGroupTotalFiles := Total;
+end;
+
+procedure TCompileProgress.EndCompileRun;
+begin
+  if FGroupRunDepth > 0 then
+  begin
+    Dec(FGroupRunDepth);
+    if FGroupRunDepth = 0 then
+    begin
+      FGroupTotalFiles := 0;
+      FGroupCompiledBase := 0;
+      FGroupCurrentExpected := 0;
+    end;
+  end;
+end;
+{$IFEND}
+
 procedure TCompileProgress.BeforeCompile(const Project: IOTAProject;
   IsCodeInsight: Boolean; var Cancel: Boolean);
 var
   i: Integer;
   Ext: string;
   FileName: string;
+  ProjectFileCount: Integer;
 begin
   if not IsCodeInsight then
   begin
@@ -652,15 +797,12 @@ begin
       UpdateLastCompileVersionInfo(Project);
     {$IFEND}
 
-    {$IF CompilerVersion <= 20.0} // Delphi 2009-
-    // Delphi 2009 and older call BeforeCompile and then StartCompile for the first project,
+    // 2009-: BeforeCompile and then StartCompile are called for the first project,
     // BeforeCompile and then StartCompile for the second project, ...
+    // 2010+: StartCompile is called once, which then calls BeforeCompile for each
+    // project. Either way the interceptor matches only the current project's files.
     TStringList(FPasFiles).Sorted := False;
     FPasFiles.Clear;
-    {$IFEND}
-    // BeforeCompile is called multiple times for multiple projects (Delphi 2010+)
-    if FPasFiles.Count = 0 then
-      FormNativeProgress.ProjectFilesCompiled := 0;
 
     FPasFiles.Add(ExtractFileName(Project.FileName));
     for i := 0 to Project.GetModuleCount - 1 do
@@ -674,7 +816,28 @@ begin
       end;
     end;
     TStringList(FPasFiles).Sorted := True;
-    FormNativeProgress.MaxFiles := FPasFiles.Count div 2;
+    ProjectFileCount := FPasFiles.Count div 2;
+
+    {$IF CompilerVersion >= 21.0} // Delphi 2010+
+    // Compiling through TProjectGroup.CompileActive/CompileAll: scale the bar to
+    // the precomputed total of all projects of this run and carry the progress
+    // across the projects instead of restarting it for every project.
+    if (FGroupRunDepth > 0) and (FGroupTotalFiles > 0) then
+    begin
+      // a new project starts: account everything before it as done
+      Inc(FGroupCompiledBase, FGroupCurrentExpected);
+      FGroupCurrentExpected := ProjectFileCount;
+      if FGroupCompiledBase + ProjectFileCount > FGroupTotalFiles then
+        FGroupTotalFiles := FGroupCompiledBase + ProjectFileCount; // estimate was too low
+      FormNativeProgress.MaxFiles := FGroupTotalFiles;
+      FormNativeProgress.ProjectFilesCompiled := FGroupCompiledBase;
+    end
+    else
+    {$IFEND}
+    begin
+      FormNativeProgress.ProjectFilesCompiled := 0;
+      FormNativeProgress.MaxFiles := ProjectFileCount;
+    end;
   end;
 end;
 
@@ -907,19 +1070,22 @@ begin
     Index := FPasFiles.IndexOf(SFilename);
     if Index <> -1 then
     begin
-      //GlobalCompileProgress.FPasFiles.Delete(Index); // prevent the file to be listed twice
+      // Count each unit only once: the first open (.pas or .dcu) removes the
+      // unit's ".dcu" marker entry, further opens of the same unit don't count.
       Index := FPasFiles.IndexOf(ChangeFileExt(SFilename, '.dcu'));
       if Index <> -1 then
+      begin
         FPasFiles.Delete(Index);
 
-      if FormNativeProgress.Form <> nil then
-      begin
-        if GetCurrentThreadId = MainThreadId then
-          FormNativeProgress.ProjectFilesCompiled := FormNativeProgress.ProjectFilesCompiled + 1
-        {$IF CompilerVersion >= 18.0} // 2006+ (TThread.Queue; pre-2006 compiles in the main thread anyway)
-        else
-          TThread.Queue(nil, UpdateInMainThread)
-        {$IFEND};
+        if FormNativeProgress.Form <> nil then
+        begin
+          if GetCurrentThreadId = MainThreadId then
+            FormNativeProgress.ProjectFilesCompiled := FormNativeProgress.ProjectFilesCompiled + 1
+          {$IF CompilerVersion >= 18.0} // 2006+ (TThread.Queue; pre-2006 compiles in the main thread anyway)
+          else
+            TThread.Queue(nil, UpdateInMainThread)
+          {$IFEND};
+        end;
       end;
     end;
     {if AnsiCompareText(ExtractFileExt(SFilename), '.pas') = 0 then

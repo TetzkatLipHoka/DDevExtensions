@@ -248,7 +248,13 @@ begin
     GlobalStartParameterControl := nil;
 
   if FNotifier <> -1 then
-    (BorlandIDEServices as IOTAServices).RemoveNotifier(FNotifier);
+    try
+      // guarded against a late-shutdown teardown where BorlandIDEServices is
+      // already nil ("as" on nil yields nil - the call would read address 0)
+      if Assigned(BorlandIDEServices) then
+        (BorlandIDEServices as IOTAServices).RemoveNotifier(FNotifier);
+    except
+    end;
   FreeAndNil(FProjectParams);
   inherited Destroy;
 end;

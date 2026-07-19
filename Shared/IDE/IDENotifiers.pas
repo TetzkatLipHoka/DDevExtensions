@@ -104,7 +104,15 @@ end;
 destructor TIDENotifierList.Destroy;
 begin
   if FId <> -1 then
-    (BorlandIDEServices as IOTAServices).RemoveNotifier(FId);
+    try
+      // Guarded: this runs from the unit finalization at DLL unload, and
+      // during late IDE shutdown BorlandIDEServices may already be nil (seen
+      // on D7 after a debug session) - "as" on a nil interface yields nil and
+      // the call would then read address 0.
+      if Assigned(BorlandIDEServices) then
+        (BorlandIDEServices as IOTAServices).RemoveNotifier(FId);
+    except
+    end;
   FNotifiers.Free;
   inherited Destroy;
 end;

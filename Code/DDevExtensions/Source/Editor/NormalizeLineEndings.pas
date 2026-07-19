@@ -250,7 +250,14 @@ begin
   begin
     if GNotifierIndex >= 0 then
     begin
-      (BorlandIDEServices as IOTAServices).RemoveNotifier(GNotifierIndex);
+      // guarded: runs from the finalization too, where BorlandIDEServices may
+      // already be nil during late IDE shutdown ("as" on nil yields nil and
+      // the call would read address 0)
+      try
+        if Assigned(BorlandIDEServices) then
+          (BorlandIDEServices as IOTAServices).RemoveNotifier(GNotifierIndex);
+      except
+      end;
       GNotifierIndex := -1;
     end;
   end;

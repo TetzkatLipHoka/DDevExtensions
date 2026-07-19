@@ -58,7 +58,7 @@ uses
   UxTheme,
   {$IFEND}
   {$IF (CompilerVersion >= 34.0) and (CompilerVersion < 37.0)}
-  Winapi.DwmApi, // DwmCompositionEnabled (guard for the hotkey buffered paint)
+  Menus, // ShortCutToText for the hotkey client paint
   {$IFEND}
   HtHint;
 
@@ -233,48 +233,63 @@ end;
 type
   { On Delphi 10.4..12 the stock TEditStyleHook themes the hotkey control's
     non-client area (the border) but leaves the client (text) background at
-    native white: the native msctls_hotkey32 ignores WM_CTLCOLOR for its
-    client fill, so neither the style hook's brush nor a manual TControl.Color
-    reaches it. Delphi 13 fixed this inside TEditStyleHook by re-rendering the
-    client through a DWM buffered paint whenever it answers CN_CTLCOLOREDIT
-    (verified as the ONLY difference between the D12 and D13
-    TEditStyleHook.WndProc). This hook ports exactly that addition and is
-    registered for the hotkey controls below. D13 (>=37) already does this, so
-    the hook is not compiled there. }
+    native white: the native msctls_hotkey32 never sends WM_CTLCOLOR, so the
+    style hook's colour path (and any manual TControl.Color) is dead - a
+    diagnostic build confirmed the hook runs but CN_CTLCOLOREDIT never arrives.
+    Delphi 13 fixed this NOT in the style hook but by giving TCustomHotKey a
+    TWinControlMessageHandler (THotKeyHandler) that paints the client itself on
+    WM_PAINT. That infrastructure does not exist before D13, so this hook does
+    the same WM_PAINT client paint (a direct port of D13's THotKeyHandler).
+    D13 (>=37) already paints itself, so the hook is not compiled there. }
   TDDevHotKeyStyleHook = class(TEditStyleHook)
-  private
-    FInBufferedPrintClient: Boolean;
   protected
     procedure WndProc(var Message: TMessage); override;
   end;
 
 procedure TDDevHotKeyStyleHook.WndProc(var Message: TMessage);
+const
+  cColor: array[Boolean] of TStyleColor = (scEditDisabled, scEdit);
+  cFont: array[Boolean] of TStyleFont = (sfEditBoxTextDisabled, sfEditBoxTextNormal);
+var
+  DC: HDC;
+  PS: TPaintStruct;
+  LCanvas: TCanvas;
+  LText: string;
+  LStyle: TCustomStyleServices;
 begin
-  if Message.Msg = CM_BUFFEREDPRINTCLIENT then
+  // Port of D13 THotKeyHandler.HandleMessage: take over WM_PAINT and draw the
+  // client with the IDE style's edit colours (the native control paints white).
+  if (Message.Msg = WM_PAINT) and Control.IsCustomStyleActive and
+     (seClient in Control.StyleElements) then
   begin
-    if FInBufferedPrintClient then
-    begin
-      try
-        PerformBufferedPrintClient(Handle, Control.ClientRect);
-      except
-        // buffered paint must never break the control
-      end;
-      FInBufferedPrintClient := False;
+    DC := HDC(Message.WParam);
+    LCanvas := TCanvas.Create;
+    try
+      if DC = 0 then
+        LCanvas.Handle := BeginPaint(Handle, PS)
+      else
+        LCanvas.Handle := DC;
+      LText := StringReplace(ShortCutToText(THotKey(Control).HotKey),
+        '+', ' + ', [rfReplaceAll]);
+      LStyle := StyleServices;
+      LCanvas.Font := TControlAccess(Control).Font;
+      LCanvas.Brush.Color := LStyle.GetStyleColor(cColor[Control.Enabled]);
+      LCanvas.Font.Color := LStyle.GetStyleFontColor(cFont[Control.Enabled]);
+      LCanvas.FillRect(Control.ClientRect); // whole client dark, then the text
+      LCanvas.TextOut(2, 2, LText);
+      if Control.Focused then
+        SetCaretPos(LCanvas.TextWidth(LText) + 2, 1);
+    finally
+      LCanvas.Handle := 0;
+      LCanvas.Free;
+      if DC = 0 then
+        EndPaint(Handle, PS);
     end;
     Handled := True;
     Exit;
   end;
 
-  inherited WndProc(Message); // sets the dark edit colors on CN_CTLCOLOREDIT
-
-  if (Message.Msg = CN_CTLCOLOREDIT) and not FInBufferedPrintClient and
-     DwmCompositionEnabled then
-  begin
-    // re-render the client into a DWM buffer so the dark background applies
-    // (D12's own TreeView edit hook uses the same CM_BUFFEREDPRINTCLIENT dance)
-    FInBufferedPrintClient := True;
-    PostMessage(Handle, CM_BUFFEREDPRINTCLIENT, 0, 0);
-  end;
+  inherited WndProc(Message);
 end;
 
 procedure TFormBase.ThemeFixupControls(AParent: TWinControl);

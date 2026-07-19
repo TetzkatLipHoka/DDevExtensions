@@ -57,6 +57,9 @@ uses
   {$IF (CompilerVersion >= 32.0) and (CompilerVersion < 34.0)}
   UxTheme,
   {$IFEND}
+  {$IF (CompilerVersion >= 34.0) and (CompilerVersion < 37.0)}
+  Winapi.DwmApi, // DwmCompositionEnabled (guard for the hotkey buffered paint)
+  {$IFEND}
   HtHint;
 
 {$R *.dfm}
@@ -226,54 +229,76 @@ begin
   {$IFEND}
 end;
 
-{$IF CompilerVersion >= 34.0}
+{$IF (CompilerVersion >= 34.0) and (CompilerVersion < 37.0)}
+type
+  { On Delphi 10.4..12 the stock TEditStyleHook themes the hotkey control's
+    non-client area (the border) but leaves the client (text) background at
+    native white: the native msctls_hotkey32 ignores WM_CTLCOLOR for its
+    client fill, so neither the style hook's brush nor a manual TControl.Color
+    reaches it. Delphi 13 fixed this inside TEditStyleHook by re-rendering the
+    client through a DWM buffered paint whenever it answers CN_CTLCOLOREDIT
+    (verified as the ONLY difference between the D12 and D13
+    TEditStyleHook.WndProc). This hook ports exactly that addition and is
+    registered for the hotkey controls below. D13 (>=37) already does this, so
+    the hook is not compiled there. }
+  TDDevHotKeyStyleHook = class(TEditStyleHook)
+  private
+    FInBufferedPrintClient: Boolean;
+  protected
+    procedure WndProc(var Message: TMessage); override;
+  end;
+
+procedure TDDevHotKeyStyleHook.WndProc(var Message: TMessage);
+begin
+  if Message.Msg = CM_BUFFEREDPRINTCLIENT then
+  begin
+    if FInBufferedPrintClient then
+    begin
+      try
+        PerformBufferedPrintClient(Handle, Control.ClientRect);
+      except
+        // buffered paint must never break the control
+      end;
+      FInBufferedPrintClient := False;
+    end;
+    Handled := True;
+    Exit;
+  end;
+
+  inherited WndProc(Message); // sets the dark edit colors on CN_CTLCOLOREDIT
+
+  if (Message.Msg = CN_CTLCOLOREDIT) and not FInBufferedPrintClient and
+     DwmCompositionEnabled then
+  begin
+    // re-render the client into a DWM buffer so the dark background applies
+    // (D12's own TreeView edit hook uses the same CM_BUFFEREDPRINTCLIENT dance)
+    FInBufferedPrintClient := True;
+    PostMessage(Handle, CM_BUFFEREDPRINTCLIENT, 0, 0);
+  end;
+end;
+
 procedure TFormBase.ThemeFixupControls(AParent: TWinControl);
 var
   ThemingServices: IOTAIDEThemingServices250;
-  Style: TCustomStyleServices;
-
-  procedure Walk(Parent: TWinControl);
-  var
-    I: Integer;
-    C: TControl;
-  begin
-    for I := 0 to Parent.ControlCount - 1 do
-    begin
-      C := Parent.Controls[I];
-      {$IF CompilerVersion < 37.0}
-      // 10.4..12: the IDE's ApplyTheme skips the native hotkey control
-      // entirely - no style, no colors, it stays black-on-white. Recolor it
-      // manually with the style's window colors and take client+font out of
-      // the style elements so the control's own colors reach it via
-      // WM_CTLCOLOREDIT. The native control honors both colors - Delphi 13
-      // proves that: there the IDE themes the hotkey itself (so D13 skips
-      // this block and keeps its confirmed-good rendering).
-      if C is TCustomHotKey then
-      begin
-        TControlAccess(C).Color := Style.GetSystemColor(clWindow);
-        TControlAccess(C).Font.Color := Style.GetSystemColor(clWindowText);
-        C.StyleElements := C.StyleElements - [seClient, seFont];
-      end;
-      {$IFEND}
-      if C is TWinControl then
-        Walk(TWinControl(C));
-    end;
-  end;
-
 begin
   // 10.4+: option page frames are created after the dialog's ApplyIDETheme
   // ran; apply the IDE style to the late-created control tree as well (the
-  // style engine handles the control colors itself, so no manual fixups
-  // beyond the hotkey repair above)
+  // style engine and the registered hooks handle the control colors)
   if Supports(BorlandIDEServices, IOTAIDEThemingServices250, ThemingServices) and
      ThemingServices.IDEThemingEnabled then
-  begin
-    Style := ThemingServices.StyleServices;
-    if Style = nil then
-      Exit;
     ThemingServices.ApplyTheme(AParent);
-    Walk(AParent);
-  end;
+end;
+{$IFEND}
+
+{$IF CompilerVersion >= 37.0}
+procedure TFormBase.ThemeFixupControls(AParent: TWinControl);
+var
+  ThemingServices: IOTAIDEThemingServices250;
+begin
+  // Delphi 13: the IDE theming (incl. the hotkey client) works out of the box
+  if Supports(BorlandIDEServices, IOTAIDEThemingServices250, ThemingServices) and
+     ThemingServices.IDEThemingEnabled then
+    ThemingServices.ApplyTheme(AParent);
 end;
 {$IFEND}
 
@@ -396,6 +421,18 @@ begin
     HintWindowClass := HintClass;
   end;
 end;
+
+{$IF (CompilerVersion >= 34.0) and (CompilerVersion < 37.0)}
+initialization
+  // Replace the stock hotkey style hook with our buffered-print variant. The
+  // engine uses the last-registered hook for a class, so this takes precedence
+  // over the VCL's own TEditStyleHook registration for these classes.
+  TCustomStyleEngine.RegisterStyleHook(TCustomHotKey, TDDevHotKeyStyleHook);
+  TCustomStyleEngine.RegisterStyleHook(THotKey, TDDevHotKeyStyleHook);
+finalization
+  TCustomStyleEngine.UnRegisterStyleHook(THotKey, TDDevHotKeyStyleHook);
+  TCustomStyleEngine.UnRegisterStyleHook(TCustomHotKey, TDDevHotKeyStyleHook);
+{$IFEND}
 
 end.
  

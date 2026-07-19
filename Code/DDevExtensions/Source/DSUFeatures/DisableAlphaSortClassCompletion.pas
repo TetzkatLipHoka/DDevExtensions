@@ -10,9 +10,15 @@ unit DisableAlphaSortClassCompletion;
 
 {$I ..\DelphiExtension.inc}
 
-{$IFDEF CPUX64}
-  {$DEFINE ALPHASORT_X64_WIP} // D13 x64: IAT-gated reorder + SetSorted no-op (see CPUX64 block)
-{$ENDIF}
+{$IF Defined(CPUX64) and (CompilerVersion >= 37.0)}
+  // D13.1 x64 ONLY. The x64 path (IAT-gated reorder + SetSorted no-op) was
+  // reverse-engineered against delphicoreide370 via a byte-pattern scan of
+  // TPascalClassCompleter.Complete; other x64 IDE versions (e.g. D12/coreide290)
+  // have a different Complete layout, so keep it D13-only until RE'd per version.
+  // The install is all-or-nothing and would just no-op elsewhere, but not even
+  // trying avoids any risk of a coincidental mis-match on an un-RE'd layout.
+  {$DEFINE ALPHASORT_X64_WIP}
+{$IFEND}
 
 interface
 

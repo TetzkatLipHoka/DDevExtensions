@@ -19,12 +19,18 @@ unit PreferProperPNG;
   Package load order is not guaranteed, so sometimes acPNG wins and pictures
   stay acPNG's fake PNG (a BMP stored under the PNG class name, not portable).
 
+  acPNG additionally registers its TPNGGraphic with extension 'png' (seen in
+  the D7 dump), so it also competes with the proper TPngImage for the
+  FindExt('png') lookup - not just for the class-name lookup.
+
   This feature arbitrates the registration ORDER instead of fighting the
   registration itself: it locates the global list via the FileFormatsListHack
-  disassembler hack, identifies "our" proper TPNGGraphic - the one from the
-  pngimage unit (pre-2009: the user's pngimage package) or DDev's own
-  FixAlphaControlsPNG class (D2009+, when that fix is compiled in) - and moves
-  that entry to the END of the list so it wins the last-wins lookup.
+  disassembler hack, identifies ALL proper PNG entries - those from the
+  pngimage unit (pre-2009: the user's pngimage package; XE2+: also the native
+  Vcl.Imaging.pngimage) or DDev's own FixAlphaControlsPNG class (D2009+, when
+  that fix is compiled in) - and moves them to the END of the list, keeping
+  their relative order, so they win both last-wins lookups (TPNGGraphic wins
+  FindClassName, TPngImage stays behind it and wins FindExt('png')).
   Non-destructive (acPNG stays registered, AlphaControls' runtime behavior is
   untouched) and idempotent, so it can run any number of times.
 
@@ -45,7 +51,7 @@ procedure SetPreferProperPNGActive(Active: Boolean);
 implementation
 
 uses
-  Windows, SysUtils, Classes, TypInfo, Graphics, ToolsAPI,
+  Windows, SysUtils, Classes, TypInfo, Graphics, Forms, ToolsAPI,
   FileFormatsListHack
   {$IF Defined(COMPILER12_UP) and Defined(INCLUDE_ACPNGFIX)}
   , FixAlphaControlsPNG
@@ -79,11 +85,26 @@ begin
     Result := string(GetTypeData(AClass.ClassInfo)^.UnitName);
 end;
 
-{ Is this the TPNGGraphic that should win? The arbiter does not need to know
-  acPNG - it only promotes "ours"; every other same-named class simply loses. }
-function IsProperPNGGraphic(AClass: TGraphicClass): Boolean;
+{ Last dot-segment of a unit name: the native pngimage lives in
+  'Vcl.Imaging.pngimage' from XE2 on, plain 'pngimage' before. }
+function UnitBaseName(const AUnitName: string): string;
+var
+  i: Integer;
 begin
-  Result := SameText(ClassUnitName(AClass), SProperPngUnitName);
+  Result := AUnitName;
+  for i := Length(Result) downto 1 do
+    if Result[i] = '.' then
+    begin
+      Result := Copy(Result, i + 1, MaxInt);
+      Break;
+    end;
+end;
+
+{ Is this one of the PNG classes that should win? The arbiter does not need to
+  know acPNG - it only promotes "ours"; everything else simply loses. }
+function IsProperPNGClass(AClass: TGraphicClass): Boolean;
+begin
+  Result := SameText(UnitBaseName(ClassUnitName(AClass)), SProperPngUnitName);
   {$IF Defined(COMPILER12_UP) and Defined(INCLUDE_ACPNGFIX)}
   Result := Result or (AClass = FixAlphaControlsPNG.TPNGGraphic);
   {$IFEND}
@@ -124,8 +145,11 @@ begin
   for i := 0 to List.Count - 1 do
   begin
     GC := List[i]^.GraphicClass;
-    Result := Result + IntToStr(i) + ':' + GC.ClassName + ':' +
-      ClassUnitName(GC) + '|';
+    if GC = nil then
+      Result := Result + IntToStr(i) + ':<nil>|'
+    else
+      Result := Result + IntToStr(i) + ':' + GC.ClassName + ':' +
+        ClassUnitName(GC) + '|';
   end;
 end;
 
@@ -133,8 +157,8 @@ procedure Arbitrate(const Trigger: string);
 var
   List: TFileFormatsListHack;
   Dump: TStringList;
-  State, Action, UnitName: string;
-  i, OurIndex, LastOtherIndex: Integer;
+  State, Action, MovedNames, AfterNames: string;
+  i, MinProper, MaxForeign, MovedCount: Integer;
   GC: TGraphicClass;
 begin
   try
@@ -154,20 +178,25 @@ begin
     if List = nil then
       Exit;
 
-    // find "our" proper TPNGGraphic (highest index) and the highest-indexed
-    // OTHER class of the same name (the one that would currently beat us)
-    OurIndex := -1;
-    LastOtherIndex := -1;
+    // find the FIRST proper PNG entry and the LAST foreign entry that
+    // competes with us - by class name (TPNGGraphic) or extension ('png',
+    // acPNG registers with ext='png'). If every proper entry already sits
+    // behind every competing foreign one, there is nothing to do.
+    MinProper := -1;
+    MaxForeign := -1;
     for i := 0 to List.Count - 1 do
     begin
       GC := List[i]^.GraphicClass;
-      if GC.ClassName = SPNGGraphicClassName then
+      if GC = nil then
+        Continue;
+      if IsProperPNGClass(GC) then
       begin
-        if IsProperPNGGraphic(GC) then
-          OurIndex := i
-        else
-          LastOtherIndex := i;
-      end;
+        if MinProper < 0 then
+          MinProper := i;
+      end
+      else if (GC.ClassName = SPNGGraphicClassName) or
+              SameText(List[i]^.Extension, 'png') then
+        MaxForeign := i;
     end;
 
     // log the pre-move state BEFORE mutating (once per distinct state)
@@ -183,9 +212,11 @@ begin
         for i := 0 to List.Count - 1 do
         begin
           GC := List[i]^.GraphicClass;
-          UnitName := ClassUnitName(GC);
-          Dump.Add(Format('  [%2d] %-16s unit=%-24s ext=''%s''',
-            [i, GC.ClassName, UnitName, List[i]^.Extension]));
+          if GC = nil then
+            Dump.Add(Format('  [%2d] <nil>', [i]))
+          else
+            Dump.Add(Format('  [%2d] %-16s unit=%-24s ext=''%s''',
+              [i, GC.ClassName, ClassUnitName(GC), List[i]^.Extension]));
         end;
         AppendLog(Dump.Text);
       finally
@@ -193,24 +224,54 @@ begin
       end;
     end;
 
-    if (OurIndex >= 0) and (LastOtherIndex > OurIndex) then
+    if (MinProper >= 0) and (MaxForeign > MinProper) then
     begin
-      List.Move(OurIndex, List.Count - 1);
-      Action := Format('moved proper TPNGGraphic [%d] -> [%d] so it wins ' +
-        'over foreign TPNGGraphic [%d]',
-        [OurIndex, List.Count - 1, LastOtherIndex]);
+      // move ALL proper PNG entries to the end, keeping their relative order:
+      // TPngImage ends up last (wins FindExt('png')), the TPNGGraphic
+      // converter right before it (wins FindClassName('TPNGGraphic'))
+      MovedCount := 0;
+      MovedNames := '';
+      i := 0;
+      while i < List.Count - MovedCount do
+      begin
+        GC := List[i]^.GraphicClass;
+        if (GC <> nil) and IsProperPNGClass(GC) then
+        begin
+          if MovedNames <> '' then
+            MovedNames := MovedNames + ', ';
+          MovedNames := MovedNames + '[' + IntToStr(i) + '] ' + GC.ClassName;
+          List.Move(i, List.Count - 1);
+          Inc(MovedCount);
+        end
+        else
+          Inc(i);
+      end;
+      AfterNames := '';
+      for i := 0 to List.Count - 1 do
+      begin
+        GC := List[i]^.GraphicClass;
+        if (GC <> nil) and IsProperPNGClass(GC) then
+        begin
+          if AfterNames <> '' then
+            AfterNames := AfterNames + ', ';
+          AfterNames := AfterNames + '[' + IntToStr(i) + '] ' + GC.ClassName;
+        end;
+      end;
+      Action := Format('moved proper PNG entries (%s) to the end - now at %s, ' +
+        'winning over the foreign entry that was at [%d]',
+        [MovedNames, AfterNames, MaxForeign]);
     end
-    else if OurIndex < 0 then
+    else if MinProper < 0 then
     begin
-      if LastOtherIndex >= 0 then
-        Action := 'foreign TPNGGraphic at [' + IntToStr(LastOtherIndex) +
-          '] but no proper one registered - nothing to promote'
+      if MaxForeign >= 0 then
+        Action := 'foreign TPNGGraphic/''png'' entry at [' +
+          IntToStr(MaxForeign) + '] but no proper PNG registered - nothing to promote'
       else
-        Action := 'no TPNGGraphic entries - nothing to do';
+        Action := 'no PNG entries - nothing to do';
     end
     else
-      Action := 'proper TPNGGraphic at [' + IntToStr(OurIndex) +
-        '] already wins - no change';
+      Action := 'proper PNG entries (first at [' + IntToStr(MinProper) +
+        ']) already win - no change';
 
     if State <> GLastLoggedState then
       AppendLog('action: ' + Action + sLineBreak + sLineBreak);
@@ -228,6 +289,10 @@ end;
 procedure TPngArbiterNotifier.FileNotification(NotifyCode: TOTAFileNotification;
   const FileName: string; var Cancel: Boolean);
 begin
+  // IDE shutdown: packages unload in droves and their graphic classes may
+  // already be gone - never walk the list then
+  if Application.Terminated then
+    Exit;
   case NotifyCode of
     ofnPackageInstalled:
       Arbitrate('package installed: ' + ExtractFileName(FileName));
@@ -257,7 +322,13 @@ begin
   begin
     if GNotifierIndex >= 0 then
     begin
-      (BorlandIDEServices as IOTAServices).RemoveNotifier(GNotifierIndex);
+      // guarded: during late IDE shutdown BorlandIDEServices may already be
+      // gone ("as" on a nil interface yields nil - calling it would AV)
+      try
+        if Assigned(BorlandIDEServices) then
+          (BorlandIDEServices as IOTAServices).RemoveNotifier(GNotifierIndex);
+      except
+      end;
       GNotifierIndex := -1;
     end;
     // deliberately no "undo": the reorder is non-destructive and harmless

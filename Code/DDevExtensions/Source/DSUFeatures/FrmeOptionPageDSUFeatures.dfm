@@ -1,10 +1,10 @@
 inherited FrameOptionPageDSUFeatures: TFrameOptionPageDSUFeatures
   Width = 385
-  Height = 366
+  Height = 390
   TabStop = True
   inherited pnlClient: TPanel
     Width = 385
-    Height = 317
+    Height = 341
     object lblEditorTabDblClickAction: TLabel
       Left = 8
       Top = 216
@@ -160,6 +160,16 @@ inherited FrameOptionPageDSUFeatures: TFrameOptionPageDSUFeatures
       Height = 17
       Caption = 'Auto-close compile progress dialog on successful compile'
       TabOrder = 13
+    end
+    object chkF12HotKeySupport: TCheckBox
+      Left = 8
+      Top = 320
+      Width = 369
+      Height = 17
+      Caption = 'Restore F12 debug hotkey (pause the running program)'
+      ParentShowHint = False
+      ShowHint = True
+      TabOrder = 14
     end
   end
   inherited pnlDescription: TPanel

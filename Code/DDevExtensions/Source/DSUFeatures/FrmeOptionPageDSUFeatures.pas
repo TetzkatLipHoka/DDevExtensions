@@ -53,6 +53,7 @@ type
     FKillDExplore: Boolean;
     FConfirmDlgOnDebugCtrlF1: Boolean;
     FDisableAlphaSortClassCompletion: Boolean;
+    FF12HotKeySupport: Boolean;
 
     procedure SetDisablePackageCache(Value: Boolean);
     procedure SetEditorDblClickAction(Value: TEditorDblClickAction);
@@ -75,6 +76,7 @@ type
     procedure SetConfirmDlgOnDebugCtrlF1(const Value: Boolean);
     //procedure SetDisableEditorClearType(Value: Boolean);
     procedure SetDisableAlphaSortClassCompletion(const Value: Boolean);
+    procedure SetF12HotKeySupport(const Value: Boolean);
   protected
     FTimerStructureView: TTimer;
     FLastParsingDots: Integer;
@@ -123,6 +125,7 @@ type
     property KillDExplore: Boolean read FKillDExplore write FKillDExplore;
     property ConfirmDlgOnDebugCtrlF1: Boolean read FConfirmDlgOnDebugCtrlF1 write SetConfirmDlgOnDebugCtrlF1;
     property DisableAlphaSortClassCompletion: Boolean read FDisableAlphaSortClassCompletion write SetDisableAlphaSortClassCompletion;
+    property F12HotKeySupport: Boolean read FF12HotKeySupport write SetF12HotKeySupport;
   end;
 
   TFrameOptionPageDSUFeatures = class(TFrameBase, ITreePageComponent)
@@ -142,6 +145,7 @@ type
     chkConfirmDlgOnDebugCtrlF1: TCheckBox;
     chkDisableAlphaSortClassCompletion: TCheckBox;
     chkAutoCloseCompileDlg: TCheckBox;
+    chkF12HotKeySupport: TCheckBox;
   private
     { Private-Deklarationen }
     FDSUFeatures: TDSUFeaturesConfig;
@@ -163,7 +167,7 @@ implementation
 
 uses
   Main, DSUFeatures, StrUtils, IDEHooks, Hooking, IDEUtils, StrucViewSearch, ToolsAPIHelpers,
-  AppConsts, DisableAlphaSortClassCompletion, CompileProgress;
+  AppConsts, DisableAlphaSortClassCompletion, F12HotKeySupport, CompileProgress;
 
 {$R *.dfm}
 
@@ -234,6 +238,7 @@ begin
   chkKillDExplore.Checked := FDSUFeatures.KillDExplore;
   chkConfirmDlgOnDebugCtrlF1.Checked := FDSUFeatures.ConfirmDlgOnDebugCtrlF1;
   chkDisableAlphaSortClassCompletion.Checked := FDSUFeatures.DisableAlphaSortClassCompletion;
+  chkF12HotKeySupport.Checked := FDSUFeatures.F12HotKeySupport;
 
   {$IF CompilerVersion < 20.0}
   // mirror of the checkbox injected into the compile progress dialog - with
@@ -281,6 +286,7 @@ begin
   FDSUFeatures.KillDExplore := chkKillDExplore.Checked;
   FDSUFeatures.ConfirmDlgOnDebugCtrlF1 := chkConfirmDlgOnDebugCtrlF1.Checked;
   FDSUFeatures.DisableAlphaSortClassCompletion := chkDisableAlphaSortClassCompletion.Checked;
+  FDSUFeatures.F12HotKeySupport := chkF12HotKeySupport.Checked;
   FDSUFeatures.Save;
 
   {$IF CompilerVersion < 20.0}
@@ -1536,6 +1542,15 @@ begin
   begin
     FDisableAlphaSortClassCompletion := Value;
     InstallDisableAlphaSortClassCompletion(FDisableAlphaSortClassCompletion);
+  end;
+end;
+
+procedure TDSUFeaturesConfig.SetF12HotKeySupport(const Value: Boolean);
+begin
+  if Value <> FF12HotKeySupport then
+  begin
+    FF12HotKeySupport := Value;
+    InstallF12HotKeySupport(FF12HotKeySupport);
   end;
 end;
 

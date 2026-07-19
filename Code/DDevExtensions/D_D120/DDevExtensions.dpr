@@ -11,7 +11,11 @@ library DDevExtensions;
 {$WEAKLINKRTTI ON}
 {$RTTI EXPLICIT METHODS([]) PROPERTIES([]) FIELDS([])}
 
+{$IFDEF CPUX64}
+{$LIBSUFFIX 'D120_64'}
+{$ELSE}
 {$LIBSUFFIX 'D120'}
+{$ENDIF}
 
 {$I ..\Source\DelphiExtension.inc}
 
@@ -92,6 +96,7 @@ uses
   DocModuleHandler in '..\Source\Editor\DocModuleHandler.pas',
   CodeInsightHandling in '..\Source\Editor\CodeInsightHandling.pas',
   DisableAlphaSortClassCompletion in '..\Source\DSUFeatures\DisableAlphaSortClassCompletion.pas',
+  F12HotKeySupport in '..\Source\DSUFeatures\F12HotKeySupport.pas',
   RemoveTextHeightProperty in '..\Source\FormDesignerHelpers\RemoveTextHeightProperty.pas',
   RemovePixelsPerInchProperty in '..\Source\FormDesignerHelpers\RemovePixelsPerInchProperty.pas',
   FixAlphaControlsPNG in '..\Source\FormDesignerHelpers\FixAlphaControlsPNG.pas',

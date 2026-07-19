@@ -52,6 +52,7 @@ implementation
 uses
   {$IF (CompilerVersion >= 32.0) and (CompilerVersion < 34.0)}
   ToolsAPI, // IDE theming services (10.2.2+)
+  UxTheme,
   {$IFEND}
   HtHint;
 
@@ -231,9 +232,15 @@ procedure TFormBase.ThemeTreeCustomDrawItem(Sender: TCustomTreeView; Node: TTree
 var
   Style: TCustomStyleServices;
 begin
-  // the 10.2/10.3 engine draws the selected tree item's text in black
+  { The selected item's text stayed black: with the Explorer window theme the
+    tree control ignores the custom draw text color for selected items, so the
+    Explorer theme is removed in ThemeFixupControls and the selection colors
+    are provided here. }
   if (cdsSelected in State) and GetIDEStyle(Style) then
+  begin
+    Sender.Canvas.Brush.Color := Style.GetSystemColor(clHighlight);
     Sender.Canvas.Font.Color := Style.GetSystemColor(clHighlightText);
+  end;
   DefaultDraw := True;
 end;
 
@@ -251,9 +258,11 @@ var
     begin
       C := Parent.Controls[I];
       // ApplyTheme leaves controls that default to clWindow (and do not
-      // inherit ParentColor) with a light client area
+      // inherit ParentColor) with a light client area.
+      // THotKey is deliberately NOT recolored: the native hotkey control only
+      // honors the background brush and keeps drawing black-on-white text.
       if (C is TCustomEdit) or (C is TCustomComboBox) or (C is TCustomListBox) or
-         (C is TCustomListView) or (C is TCustomTreeView) or (C is THotKey) then
+         (C is TCustomListView) or (C is TCustomTreeView) then
       begin
         TControlAccess(C).Color := Style.GetSystemColor(clWindow);
         TControlAccess(C).Font.Color := Style.GetSystemColor(clWindowText);
@@ -262,8 +271,12 @@ var
       else if (C is TCustomLabel) or (C is TCustomStaticText) then
         TControlAccess(C).Font.Color := Style.GetSystemColor(clWindowText);
       if C is TCustomTreeView then
+      begin
+        // the Explorer theme ignores custom draw colors for selected items
+        SetWindowTheme(TWinControl(C).Handle, '', '');
         if not Assigned(TTreeViewAccess(C).OnCustomDrawItem) then
           TTreeViewAccess(C).OnCustomDrawItem := ThemeTreeCustomDrawItem;
+      end;
       if C is TWinControl then
         Walk(TWinControl(C));
     end;

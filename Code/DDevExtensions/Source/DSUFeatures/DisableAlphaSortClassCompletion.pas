@@ -323,37 +323,48 @@ end;}
 
 {$IFDEF CPUX64}
 // ---------------------------------------------------------------------------
-//  Delphi 13 x64 — diagnostic-first (step 1). See scratchpad alphasort_x64_RE.md.
-//  The x86 byte-pattern patcher does not apply on x64. Here we only install a
-//  behavior-neutral pass-through on the Symbols::TTableIterator constructor
-//  (imported by delphicoreide370 from designide370) and LOG the real x64 object
-//  layouts, scoped via the return address to calls coming from
-//  TPascalClassCompleter.Complete only. Goal: derive the true field offsets
-//  (TSymbolTable.FCount/FSymbolList, TBaseSymbol.Next, TMethodSignature.*)
-//  before the real reordering hook is written. Patches the IAT slot (full
-//  64-bit pointer) so there is no rel32 / near-trampoline concern.
+//  Delphi 13 x64 implementation. The x86 path scans Complete for byte patterns
+//  and ReplaceRelCallOffset-patches the iterator ctor / GetSymbol / SetSorted
+//  calls. On x64 those calls are IMPORTED from designide370 (Symbols::
+//  TTableIterator) via delphicoreide370 IAT stubs, and there is no separate
+//  SetSorted call (folded into the ctor). All the object layouts this unit
+//  relies on (TSymbolTable.FCount@+8/FSymbolList@+0x10, TBaseSymbol.Next@+8,
+//  TMethodSymbol.FMethodSignature@+0x118, TMethodSignature.HeaderPos@+0x1C/
+//  CodePos@+0x2C, TTableIterator.FCount@+0x18) were confirmed by a diagnostic
+//  round against the live IDE and match exactly what the compiler generates
+//  for these decls on x64 (see scratchpad alphasort_x64_offsets.md).
+//
+//  Wiring strategy: patch the ctor & GetSymbol IAT slots (full 64-bit pointer,
+//  so no rel32 / near-trampoline concern) to gate functions that check whether
+//  the caller's return address is inside TPascalClassCompleter.Complete:
+//    - from Complete  -> our reordering factory / GetSymbol (declaration order)
+//    - otherwise      -> delegate to the real designide ctor / GetSymbol
+//  so the IDE-wide IAT patch is safe for every other caller. The MethodAddPos
+//  redirect is a normal function-entry hook (RedirectOrgCall), as on x86.
 // ---------------------------------------------------------------------------
 const
-  sDsgnTableIteratorCtor = '_ZN7Symbols14TTableIteratorC3EPNS_12TSymbolTableE';
+  sDsgnTableIteratorCtor      = '_ZN7Symbols14TTableIteratorC3EPNS_12TSymbolTableE';
+  sDsgnTableIteratorGetSymbol = '_ZN7Symbols14TTableIterator9GetSymbolEi';
 
 type
   TIteratorCtorProc = function(AClass: Pointer; AllocFlag: NativeInt; ATable: Pointer): Pointer;
+  TIteratorGetSymProc = function(Instance: Pointer; Index: Integer): Pointer;
 
 var
-  DiagCtorIatSlot: PPointer;       // patched IAT slot in delphicoreide370
-  DiagOrgCtor: Pointer;            // original designide ctor
-  DiagCompleteLo, DiagCompleteHi: NativeUInt;
-  DiagLogged: Integer;            // throttle: only the first few completion calls
-  DiagSymDumped: Boolean;         // round 2: dump the symbol objects of the first populated table once
+  AlphaCtorIatSlot: PPointer;    // delphicoreide370 IAT slot for the ctor
+  AlphaGetSymIatSlot: PPointer;  // delphicoreide370 IAT slot for GetSymbol
+  AlphaOrgCtor: Pointer;         // real designide ctor
+  AlphaOrgGetSym: Pointer;       // real designide GetSymbol
+  AlphaCompleteLo, AlphaCompleteHi: NativeUInt;
+  AlphaMethodAddPosHooked: Boolean;
 
-procedure DiagLog(const S: string);
+procedure AlphaLog(const S: string);
 var
   F: TextFile;
-  Dir, FileName: string;
+  FileName: string;
 begin
   try
-    Dir := GetEnvironmentVariable('APPDATA') + '\DDevExtensions';
-    FileName := Dir + '\AlphaSort.log';
+    FileName := GetEnvironmentVariable('APPDATA') + '\DDevExtensions\AlphaSort.log';
     AssignFile(F, FileName);
     if FileExists(FileName) then Append(F) else Rewrite(F);
     try
@@ -362,38 +373,35 @@ begin
       CloseFile(F);
     end;
   except
-    // diagnostics must never break the IDE
+    // status logging must never break the IDE
   end;
 end;
 
-function DiagHexDump(P: Pointer; Len: Integer): string;
+// A ctor call from inside Complete gets our reordering iterator; every other
+// caller in the IDE gets the untouched designide iterator.
+function AlphaCtorGate(AClass: Pointer; AllocFlag: NativeInt; ATable: Pointer): Pointer;
 var
-  i: Integer;
-  b: PByte;
-  line: string;
+  ra: NativeUInt;
 begin
-  Result := '';
-  b := PByte(P);
-  i := 0;
-  line := '';
-  while i < Len do
-  begin
-    if (i and 15) = 0 then
-    begin
-      if i > 0 then Result := Result + line + sLineBreak;
-      line := Format('  +%3.3x: ', [i]);
-    end;
-    try
-      line := line + IntToHex(b[i], 2) + ' ';
-    except
-      line := line + '?? ';
-    end;
-    Inc(i);
-  end;
-  Result := Result + line;
+  ra := NativeUInt(ReturnAddress);
+  if (ra >= AlphaCompleteLo) and (ra < AlphaCompleteHi) then
+    Result := MethodSymbolTableIteratorFactory(TClass(AClass), Integer(AllocFlag), TSymbolTable(ATable))
+  else
+    Result := TIteratorCtorProc(AlphaOrgCtor)(AClass, AllocFlag, ATable);
 end;
 
-function DiagReadable(P: Pointer; Len: NativeUInt): Boolean;
+function AlphaGetSymGate(Instance: Pointer; Index: Integer): Pointer;
+var
+  ra: NativeUInt;
+begin
+  ra := NativeUInt(ReturnAddress);
+  if (ra >= AlphaCompleteLo) and (ra < AlphaCompleteHi) then
+    Result := TTableIterator(Instance).GetSymbol(Index)
+  else
+    Result := TIteratorGetSymProc(AlphaOrgGetSym)(Instance, Index);
+end;
+
+function AlphaReadable(P: Pointer; Len: NativeUInt): Boolean;
 var
   mbi: TMemoryBasicInformation;
 begin
@@ -402,111 +410,13 @@ begin
   if VirtualQuery(P, mbi, SizeOf(mbi)) = 0 then Exit;
   if mbi.State <> MEM_COMMIT then Exit;
   if (mbi.Protect and (PAGE_NOACCESS or PAGE_GUARD)) <> 0 then Exit;
-  // whole range must lie inside this committed region
   Result := NativeUInt(P) + Len <= NativeUInt(mbi.BaseAddress) + NativeUInt(mbi.RegionSize);
 end;
 
-// Round 3: TBaseSymbol.Next @ +0x08 and FShortIdent(ShortString) @ +0x10 are
-// confirmed. Walk each bucket's Next chain, dump each symbol to 0x160 (so
-// FIdent @ +0x110 and FMethodSignature @ +0x118 are visible) and, for the first
-// few symbols, chase the +0x108..+0x120 pointer fields to dump the signature
-// object (TMethodSignature.HeaderPos/CodePos/TypeData).
-procedure DiagDumpTable(ATable: Pointer);
-const
-  NEXT_OFF = $08;
-var
-  cnt, i, off, symDumps, sigDumps: Integer;
-  head, sym, tgt: Pointer;
-begin
-  if not DiagReadable(ATable, $10) then Exit;
-  cnt := PInteger(PByte(ATable) + 8)^;
-  DiagLog(Format('=== populated SymbolTable walk: @%p FCount@+8=%d ===', [ATable, cnt]));
-  symDumps := 0;
-  sigDumps := 0;
-  for i := 0 to 31 do
-  begin
-    if symDumps >= 40 then Break;
-    head := PPointer(PByte(ATable) + $10 + i * 8)^;
-    if head = nil then Continue;
-    sym := head;
-    while (sym <> nil) and DiagReadable(sym, $160) and (symDumps < 40) do
-    begin
-      DiagLog(Format('sym bucket[%d] @%p:', [i, sym]));
-      DiagLog(DiagHexDump(sym, $160));
-      Inc(symDumps);
-      // chase the FIdent / FMethodSignature region once for the first few symbols
-      if sigDumps < 6 then
-      begin
-        off := $108;
-        while off <= $120 do
-        begin
-          if DiagReadable(PByte(sym) + off, 8) then
-          begin
-            tgt := PPointer(PByte(sym) + off)^;
-            if DiagReadable(tgt, $A0) then
-            begin
-              DiagLog(Format('  [+%x]->%p (sig/ident?):', [off, tgt]));
-              DiagLog(DiagHexDump(tgt, $A0));
-              Inc(sigDumps);
-            end;
-          end;
-          Inc(off, 8);
-        end;
-      end;
-      sym := PPointer(PByte(sym) + NEXT_OFF)^;   // follow Next chain
-    end;
-  end;
-end;
-
-function DiagIteratorCtor(AClass: Pointer; AllocFlag: NativeInt; ATable: Pointer): Pointer;
-var
-  Org: TIteratorCtorProc;
-  ra: NativeUInt;
-  inComplete: Boolean;
-begin
-  Org := TIteratorCtorProc(DiagOrgCtor);
-  Result := Org(AClass, AllocFlag, ATable);   // behavior-neutral: real ctor runs unchanged
-
-  ra := NativeUInt(ReturnAddress);
-  inComplete := (ra >= DiagCompleteLo) and (ra < DiagCompleteHi);
-  if not inComplete then
-    Exit;
-
-  if DiagLogged < 4 then
-  begin
-    Inc(DiagLogged);
-    try
-      DiagLog('--- TTableIterator ctor from Complete, call #' + IntToStr(DiagLogged) + ' ---');
-      DiagLog(Format('  ret=%p AClass=%p AllocFlag=%d ATable=%p Iterator=%p',
-        [Pointer(ra), AClass, AllocFlag, ATable, Result]));
-      if ATable <> nil then
-      begin
-        DiagLog('  SymbolTable dump (0x140 bytes):');
-        DiagLog(DiagHexDump(ATable, $140));
-      end;
-      if Result <> nil then
-      begin
-        DiagLog('  Iterator dump (0x40 bytes):');
-        DiagLog(DiagHexDump(Result, $40));
-      end;
-    except
-      DiagLog('  (exception during dump)');
-    end;
-  end;
-
-  // Round 2: dump the first populated table's symbol objects (once).
-  if (not DiagSymDumped) and DiagReadable(ATable, $10) and (PInteger(PByte(ATable) + 8)^ > 0) then
-  begin
-    DiagSymDumped := True;
-    try
-      DiagDumpTable(ATable);
-    except
-      DiagLog('  (exception during table walk)');
-    end;
-  end;
-end;
-
-function DiagFindCtorIatSlot(CompleteP, RealCtor: Pointer): PPointer;
+// Locate the delphicoreide IAT slot that Complete uses to reach a designide
+// export, by scanning Complete for the E8 call whose import stub reads a slot
+// currently holding RealFn.
+function AlphaFindIatSlot(CompleteP, RealFn: Pointer): PPointer;
 var
   p, limit, t: PByte;
   slot: PPointer;
@@ -519,93 +429,131 @@ begin
     if p^ = $E8 then
     begin
       try
-        t := PByte(GetCallTargetAddress(p));   // E8 direct target = import stub
+        t := PByte(GetCallTargetAddress(p));       // E8 direct target = import stub
         if (t <> nil) and (t[0] = $FF) and (t[1] = $25) then
         begin
-          slot := PPointer(t + 6 + PInteger(t + 2)^);   // FF25 -> *[rip+disp32] = IAT slot
-          if slot^ = RealCtor then
+          slot := PPointer(t + 6 + PInteger(t + 2)^); // FF25 -> *[rip+disp32] = IAT slot
+          if AlphaReadable(slot, SizeOf(Pointer)) and (slot^ = RealFn) then
           begin
             Result := slot;
             Exit;
           end;
         end;
       except
-        // mis-aligned E8 operand pointing at unmapped memory - ignore
+        // mis-aligned E8 operand - ignore
       end;
     end;
     Inc(p);
   end;
 end;
 
-procedure InstallAlphaSortDiag(Value: Boolean);
+function AlphaPatchSlot(Slot: PPointer; NewValue: Pointer): Boolean;
+var
+  OldProt: DWORD;
+begin
+  Result := False;
+  if (Slot = nil) or not AlphaReadable(Slot, SizeOf(Pointer)) then Exit;
+  if VirtualProtect(Slot, SizeOf(Pointer), PAGE_READWRITE, OldProt) then
+  begin
+    Slot^ := NewValue;
+    VirtualProtect(Slot, SizeOf(Pointer), OldProt, OldProt);
+    Result := True;
+  end;
+end;
+
+procedure InstallAlphaSortX64(Value: Boolean);
 var
   hCore, hDsgn: THandle;
-  RealCtor, CompleteP: Pointer;
-  OldProt: DWORD;
+  CompleteP: Pointer;
 begin
   if Value then
   begin
-    if DiagCtorIatSlot <> nil then Exit;   // already installed
+    if AlphaCtorIatSlot <> nil then Exit;   // already installed
 
     hCore := GetModuleHandle(delphicoreide_bpl);
     hDsgn := GetModuleHandle(designide_bpl);
     if (hCore = 0) or (hDsgn = 0) then
     begin
-      DiagLog('install: BPL not loaded (core=' + IntToStr(hCore) + ' dsgn=' + IntToStr(hDsgn) + ')');
+      AlphaLog(Format('install: BPL not loaded (core=%d dsgn=%d)', [hCore, hDsgn]));
       Exit;
     end;
 
-    RealCtor := GetProcAddress(hDsgn, sDsgnTableIteratorCtor);
-    if RealCtor = nil then
+    AlphaOrgCtor := GetProcAddress(hDsgn, sDsgnTableIteratorCtor);
+    AlphaOrgGetSym := GetProcAddress(hDsgn, sDsgnTableIteratorGetSymbol);
+    if (AlphaOrgCtor = nil) or (AlphaOrgGetSym = nil) then
     begin
-      DiagLog('install: ctor symbol not found in designide');
+      AlphaLog('install: designide ctor/GetSymbol symbol not found');
       Exit;
     end;
 
     CompleteP := GetActualAddr(@TPascalClassCompleter_Complete);
     if CompleteP = nil then
     begin
-      DiagLog('install: Complete not resolved');
+      AlphaLog('install: Complete not resolved');
       Exit;
     end;
-    DiagCompleteLo := NativeUInt(CompleteP);
-    DiagCompleteHi := DiagCompleteLo + $1200;
+    AlphaCompleteLo := NativeUInt(CompleteP);
+    AlphaCompleteHi := AlphaCompleteLo + $1200;
 
-    DiagCtorIatSlot := DiagFindCtorIatSlot(CompleteP, RealCtor);
-    if DiagCtorIatSlot = nil then
+    AlphaCtorIatSlot := AlphaFindIatSlot(CompleteP, AlphaOrgCtor);
+    AlphaGetSymIatSlot := AlphaFindIatSlot(CompleteP, AlphaOrgGetSym);
+    if (AlphaCtorIatSlot = nil) or (AlphaGetSymIatSlot = nil) then
     begin
-      DiagLog('install: ctor IAT slot not found in Complete');
+      AlphaLog(Format('install: IAT slot not found (ctor=%p getsym=%p)',
+        [AlphaCtorIatSlot, AlphaGetSymIatSlot]));
+      AlphaCtorIatSlot := nil;
+      AlphaGetSymIatSlot := nil;
       Exit;
     end;
 
-    DiagOrgCtor := RealCtor;
-    DiagLogged := 0;
-    DiagSymDumped := False;
-    if VirtualProtect(DiagCtorIatSlot, SizeOf(Pointer), PAGE_READWRITE, OldProt) then
+    if not AlphaPatchSlot(AlphaCtorIatSlot, @AlphaCtorGate) then
     begin
-      DiagCtorIatSlot^ := @DiagIteratorCtor;
-      VirtualProtect(DiagCtorIatSlot, SizeOf(Pointer), OldProt, OldProt);
-      DiagLog(Format('install: hook active, IAT slot=%p, realCtor=%p, Complete=%p',
-        [DiagCtorIatSlot, RealCtor, CompleteP]));
-    end
-    else
-    begin
-      DiagLog('install: VirtualProtect failed');
-      DiagCtorIatSlot := nil;
+      AlphaLog('install: ctor slot patch failed');
+      AlphaCtorIatSlot := nil;
+      AlphaGetSymIatSlot := nil;
+      Exit;
     end;
+    if not AlphaPatchSlot(AlphaGetSymIatSlot, @AlphaGetSymGate) then
+    begin
+      AlphaPatchSlot(AlphaCtorIatSlot, AlphaOrgCtor); // roll back ctor patch
+      AlphaLog('install: getsym slot patch failed');
+      AlphaCtorIatSlot := nil;
+      AlphaGetSymIatSlot := nil;
+      Exit;
+    end;
+
+    // Insertion-position redirect (same as x86): make MethodAddPos behave as if
+    // the new method name were empty. RedirectOrgCall handles the x64 trampoline.
+    if not AlphaMethodAddPosHooked then
+    begin
+      if Assigned(OrgTClassSymbol_MethodAddPos) then
+        RedirectOrg(@TClassSymbol_MethodAddPos, @TClassSymbol_MethodAddPos_AlphSort)
+      else
+        @OrgTClassSymbol_MethodAddPos := RedirectOrgCall(@TClassSymbol_MethodAddPos, @TClassSymbol_MethodAddPos_AlphSort);
+      AlphaMethodAddPosHooked := True;
+    end;
+
+    AlphaLog(Format('install: active (ctorSlot=%p getsymSlot=%p Complete=%p)',
+      [AlphaCtorIatSlot, AlphaGetSymIatSlot, CompleteP]));
   end
   else
   begin
-    if DiagCtorIatSlot <> nil then
+    if AlphaCtorIatSlot <> nil then
     begin
-      if VirtualProtect(DiagCtorIatSlot, SizeOf(Pointer), PAGE_READWRITE, OldProt) then
-      begin
-        DiagCtorIatSlot^ := DiagOrgCtor;
-        VirtualProtect(DiagCtorIatSlot, SizeOf(Pointer), OldProt, OldProt);
-        DiagLog('uninstall: IAT slot restored');
-      end;
-      DiagCtorIatSlot := nil;
+      AlphaPatchSlot(AlphaCtorIatSlot, AlphaOrgCtor);
+      AlphaCtorIatSlot := nil;
     end;
+    if AlphaGetSymIatSlot <> nil then
+    begin
+      AlphaPatchSlot(AlphaGetSymIatSlot, AlphaOrgGetSym);
+      AlphaGetSymIatSlot := nil;
+    end;
+    if AlphaMethodAddPosHooked then
+    begin
+      RestoreOrgCall(@TClassSymbol_MethodAddPos, @OrgTClassSymbol_MethodAddPos);
+      AlphaMethodAddPosHooked := False;
+    end;
+    AlphaLog('uninstall: restored');
   end;
 end;
 {$ENDIF CPUX64}
@@ -721,8 +669,8 @@ begin
 end;
 {$ELSE}
 begin
-  // Win64 (Delphi 13): diagnostic-first step 1 — see the CPUX64 block above.
-  InstallAlphaSortDiag(Value);
+  // Win64 (Delphi 13): IAT-gated reorder + MethodAddPos redirect (see CPUX64 block above).
+  InstallAlphaSortX64(Value);
 end;
 {$ENDIF ~CPUX64}
 

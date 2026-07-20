@@ -82,7 +82,7 @@ implementation
 
 uses
   Main, LabelMarginHelper, PreferProperPNG,
-  {$IF Defined(COMPILER12_UP) and Defined(INCLUDE_ACPNGFIX)}FixAlphaControlsPNG,{$IFEND}
+  {$IFDEF INCLUDE_ACPNGFIX}FixAlphaControlsPNG,{$ENDIF}
   {$IFDEF DELPHI28_UP}RemovePixelsPerInchProperty,{$ENDIF}
   RemoveExplicitProperty,
   RemoveTextHeightProperty;
@@ -112,7 +112,7 @@ begin
   chkRemoveExplicitProperties.Enabled := cbxActive.Checked;
   chkRemovePixelsPerInchProperties.Enabled := {$IFDEF DELPHI28_UP}cbxActive.Checked{$ELSE}False{$ENDIF};
   chkRemoveTextHeightProperty.Enabled := {$IFDEF DELPHI28_UP}cbxActive.Checked{$ELSE}False{$ENDIF};
-  chkFixAlphaControlsPNG.Enabled := {$IF Defined(COMPILER12_UP) and Defined(INCLUDE_ACPNGFIX)}cbxActive.Checked{$ELSE}False{$IFEND};
+  chkFixAlphaControlsPNG.Enabled := {$IFDEF INCLUDE_ACPNGFIX}cbxActive.Checked{$ELSE}False{$ENDIF};
   chkPreferProperPNG.Enabled := cbxActive.Checked;
 end;
 
@@ -258,9 +258,9 @@ begin
   SetRemoveExplicitPropertyActive(Active and RemoveExplicitProperty);
   {$ENDIF COMPILER10_UP}
 
-  {$IF Defined(COMPILER12_UP) and Defined(INCLUDE_ACPNGFIX)}
+  {$IFDEF INCLUDE_ACPNGFIX}
   SetFixAlphaControlsPNGActive(Active and FixAlphaControlsPNG);
-  {$IFEND}
+  {$ENDIF}
 
   SetPreferProperPNGActive(Active and PreferProperPNG);
   

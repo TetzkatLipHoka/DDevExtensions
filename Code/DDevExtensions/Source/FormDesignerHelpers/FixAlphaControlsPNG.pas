@@ -5,7 +5,7 @@ unit FixAlphaControlsPNG;
 
 interface
 
-{$IF Defined(COMPILER12_UP) and Defined(INCLUDE_ACPNGFIX)}
+{$IFDEF INCLUDE_ACPNGFIX}
 
 uses
   Classes, Graphics, pngimage;
@@ -24,16 +24,16 @@ type
 
 procedure SetFixAlphaControlsPNGActive(Active: Boolean);
 
-{$IFEND}
+{$ENDIF}
 
 implementation
 
-{$IF Defined(COMPILER12_UP) and Defined(INCLUDE_ACPNGFIX)}
+{$IFDEF INCLUDE_ACPNGFIX}
 uses
   pnglang;
-{$IFEND}
+{$ENDIF}
 
-{$IF Defined(COMPILER12_UP) and Defined(INCLUDE_ACPNGFIX)}
+{$IFDEF INCLUDE_ACPNGFIX}
 
 {
   acPNG (AlphaControls) DFM stream layout that LoadFromStream below parses
@@ -187,12 +187,36 @@ begin
   begin
     IsActive := Active;
     if Active then
-      TPicture.RegisterFileFormat('', 'Portable network graphics (AlphaControls)', TPNGGraphic)
+    begin
+      {$IFNDEF COMPILER12_UP}
+      // pre-2009 IDEs have no native pngimage: also provide the statically
+      // linked TPngImage, so 'png' files load properly and the DFMs written
+      // by our converter (class name 'TPngImage') stream back in
+      TPicture.RegisterFileFormat('png', 'Portable Network Graphics', TPngImage);
+      {$ENDIF}
+      TPicture.RegisterFileFormat('', 'Portable network graphics (AlphaControls)', TPNGGraphic);
+    end
     else
+    begin
       TPicture.UnregisterGraphicClass(TPNGGraphic);
+      {$IFNDEF COMPILER12_UP}
+      TPicture.UnregisterGraphicClass(TPngImage);
+      {$ENDIF}
+    end;
   end;
 end;
 
-{$IFEND}
+{$IFNDEF COMPILER12_UP}
+initialization
+  // The statically linked pngimage registers its TPngImage (and its own
+  // TPNGGraphic converter) in its unit initialization as soon as this DLL
+  // loads. Undo that right away - the option checkbox decides. A pngimage
+  // PACKAGE installed in the IDE is untouched: UnregisterGraphicClass removes
+  // by InheritsFrom, and the package's classes belong to a different class
+  // tree than this DLL's statically linked copies.
+  TPicture.UnregisterGraphicClass(TPngImage);
+{$ENDIF}
+
+{$ENDIF}
 
 end.

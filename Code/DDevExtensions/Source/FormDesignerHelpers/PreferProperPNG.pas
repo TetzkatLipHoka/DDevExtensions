@@ -53,9 +53,9 @@ implementation
 uses
   Windows, SysUtils, Classes, TypInfo, Graphics, Forms, ToolsAPI,
   FileFormatsListHack
-  {$IF Defined(COMPILER12_UP) and Defined(INCLUDE_ACPNGFIX)}
+  {$IFDEF INCLUDE_ACPNGFIX}
   , FixAlphaControlsPNG
-  {$IFEND};
+  {$ENDIF};
 
 const
   SPNGGraphicClassName = 'TPNGGraphic';
@@ -105,9 +105,9 @@ end;
 function IsProperPNGClass(AClass: TGraphicClass): Boolean;
 begin
   Result := SameText(UnitBaseName(ClassUnitName(AClass)), SProperPngUnitName);
-  {$IF Defined(COMPILER12_UP) and Defined(INCLUDE_ACPNGFIX)}
+  {$IFDEF INCLUDE_ACPNGFIX}
   Result := Result or (AClass = FixAlphaControlsPNG.TPNGGraphic);
-  {$IFEND}
+  {$ENDIF}
 end;
 
 procedure AppendLog(const Text: string);

@@ -6,7 +6,7 @@ Version: 2.90
 - Fixed: "Disable alphabetical sorting of class completion" now works in the 64-bit IDE
 - Added: TDataModule.PixelsPerInch property remover (Delphi 11 and newer)
 - Added: IDE-Theme
-- Added: TPNGGraphic (acPNG) to TPngImage converter (2009 and newer)
+- Added: TPNGGraphic (acPNG) to TPngImage converter (all versions; pre-2009 also registers a bundled TPngImage)
 - Added: "Prefer proper PNG over AlphaControls" - arbitrates the VCL graphic-format registration order so the proper TPNGGraphic wins over acPNG's fake PNG
 
 Version: 2.89

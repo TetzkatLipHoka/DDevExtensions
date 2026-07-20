@@ -12,9 +12,14 @@ is logged before mutating). The list is reached via
 `Source/FormDesignerHelpers/FileFormatsListHack.pas` (renamed from `uTLH.FileFormatsList`
 — D7 rejects dotted unit names).
 
-The old `FixAlphaControlsPNG` DFM-converter remains **disabled**: enable with
-`{$DEFINE INCLUDE_ACPNGFIX}` in `Code/DDevExtensions/Source/DelphiExtension.inc`
-(D2009+ only). Until then it compiles to an empty unit and its checkbox is disabled.
+The `FixAlphaControlsPNG` DFM-converter is **enabled** (`INCLUDE_ACPNGFIX` defined,
+2026-07-20) and no longer 2009-gated: on pre-2009 IDEs the D7 build statically links the
+patched PNGDelphi (`C:\Delphi\7\TLH\Packages\PNGDelphi\source`, path in `build_d7.bat`).
+Its self-registration is undone immediately in the unit initialization; the checkbox then
+registers/unregisters the bundled `TPngImage` (ext 'png') plus the `TPNGGraphic` converter,
+so IDEs with only a retail pngimage (or none) still get working acPNG conversion and PNG
+round-tripping. An installed pngimage PACKAGE is never touched (UnregisterGraphicClass
+works via InheritsFrom on a different class tree).
 
 ## Background / the problem
 - **Delphi 7 has no native `pngimage`.** AlphaControls silently ships its own **acPNG** to

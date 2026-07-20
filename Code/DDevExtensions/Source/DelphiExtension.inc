@@ -52,9 +52,7 @@
 {$DEFINE INCLUDE_STRUCVIEWSEARCH} // 2.0
 {$DEFINE INCLUDE_COMPONENTSELECTOR}
 {$DEFINE INCLUDE_OLDPALETTE}
-// acPNG / AlphaControls PNG registration fix - separate WIP (see doc/acPNG-Fix-TODO.md).
-// Off for now: the current FixAlphaControlsPNG is incomplete. Enable to work on it (D2009+).
-{.$DEFINE INCLUDE_ACPNGFIX}
+{$DEFINE INCLUDE_ACPNGFIX}
 
 {------------------------------------------------------------------------------}
 // dependencies

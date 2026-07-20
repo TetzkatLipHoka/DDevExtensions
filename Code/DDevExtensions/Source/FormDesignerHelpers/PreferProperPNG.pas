@@ -110,7 +110,10 @@ begin
   {$ENDIF}
 end;
 
+{.$DEFINE PNGDIAG} // diagnostic dumps to %APPDATA%\DDevExtensions\PNGArbiter.log (dot = off)
+
 procedure AppendLog(const Text: string);
+{$IFDEF PNGDIAG}
 var
   Dir, Fn: string;
   F: TextFile;
@@ -133,6 +136,12 @@ begin
     // diagnostics must never break the IDE
   end;
 end;
+{$ELSE}
+begin
+  // diagnostics disabled - re-enable PNGDIAG above when investigating the
+  // graphic-format registration on a new IDE / package constellation
+end;
+{$ENDIF}
 
 { Signature of the current list ordering; also used to decide whether the
   state is worth logging again. }

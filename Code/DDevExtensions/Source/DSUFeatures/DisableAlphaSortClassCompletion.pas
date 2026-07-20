@@ -400,7 +400,10 @@ var
   AlphaSetSortedOrgBytes: array[0..4] of Byte; // original call bytes for uninstall
   AlphaSetSortedPatched: Boolean;
 
+{.$DEFINE ALPHASORTDIAG} // diagnostic log to %APPDATA%\DDevExtensions\AlphaSort.log (dot = off)
+
 procedure AlphaLog(const S: string);
+{$IFDEF ALPHASORTDIAG}
 var
   F: TextFile;
   FileName: string;
@@ -418,6 +421,12 @@ begin
     // status logging must never break the IDE
   end;
 end;
+{$ELSE}
+begin
+  // diagnostics disabled - re-enable ALPHASORTDIAG above when reverse
+  // engineering a new IDE version's symbol layout
+end;
+{$ENDIF}
 
 function AlphaReadable(P: Pointer; Len: NativeUInt): Boolean;
 var

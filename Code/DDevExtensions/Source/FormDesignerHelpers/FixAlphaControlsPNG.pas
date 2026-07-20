@@ -10,6 +10,16 @@ interface
 uses
   Classes, Graphics, pngimage;
 
+{$IFNDEF COMPILER12_UP}
+// Pre-2009 IDEs have no native pngimage. DDevExtensions statically links the
+// bundled Shared\PNGDelphi copy (built with -DDDEV_PNG_NOINIT, i.e. without
+// self-registration), so PNG support in the IDE can be offered as a feature
+// of its own: SetIDEPngSupportActive registers the bundled TPngImage for the
+// 'png' extension - unless some other proper PNG provider (a pngimage/
+// PNGDelphi package) is already registered.
+procedure SetIDEPngSupportActive(Active: Boolean);
+{$ENDIF}
+
 type
   {$IFDEF PNGGraphicBMP} // Converter for AlphaControls (acPNG)
   TPNGGraphic = class( TBitmap ) 
@@ -30,6 +40,7 @@ implementation
 
 {$IFDEF INCLUDE_ACPNGFIX}
 uses
+  {$IFNDEF COMPILER12_UP}SysUtils, FileFormatsListHack,{$ENDIF}
   pnglang;
 {$ENDIF}
 
@@ -179,7 +190,84 @@ end;
 {$ENDIF PNGGraphic}
 
 var
-  IsActive: Boolean;
+  IsActive: Boolean;                 // acPNG-converter switch
+{$IFNDEF COMPILER12_UP}
+  IsPngSupportActive: Boolean;       // "PNG support in the IDE" switch
+  PngImageRegistered: Boolean;       // bundled TPngImage currently registered by us
+{$ENDIF}
+
+{$IFNDEF COMPILER12_UP}
+{ Is some OTHER working PNG provider registered? (a pngimage/PNGDelphi
+  package's TPngImage or a retail TPNGObject - anything claiming ext 'png'
+  whose class is neither named TPNGGraphic (that would be acPNG's fake class
+  or an acPNG converter) nor our own bundled class). If the list hack is
+  unavailable we cannot tell and assume none, so the feature still works. }
+function ForeignPngProviderPresent: Boolean;
+var
+  List: TFileFormatsListHack;
+  i: Integer;
+  GC: TGraphicClass;
+begin
+  Result := False;
+  try
+    if not Assigned(GetFileFormats) then
+      Exit;
+    List := GetFileFormats();
+    if List = nil then
+      Exit;
+    for i := 0 to List.Count - 1 do
+    begin
+      GC := List[i]^.GraphicClass;
+      if (GC <> nil) and (GC <> TPngImage) and
+         (GC.ClassName <> 'TPNGGraphic') and
+         SameText(List[i]^.Extension, 'png') then
+      begin
+        Result := True;
+        Exit;
+      end;
+    end;
+  except
+  end;
+end;
+
+{ The bundled TPngImage registration is shared: the converter needs it so its
+  'TPngImage' DFM output streams back in, and the PNG-support feature IS it.
+  Registered exactly when either switch is on and no foreign provider already
+  serves 'png'. }
+procedure UpdatePngImageRegistration;
+var
+  Need: Boolean;
+begin
+  Need := (IsActive or IsPngSupportActive) and not ForeignPngProviderPresent;
+  if Need = PngImageRegistered then
+    Exit;
+  PngImageRegistered := Need;
+  if Need then
+    TPicture.RegisterFileFormat('png', 'Portable Network Graphics', TPngImage)
+  else
+  begin
+    // remove ONLY our bundled TPngImage entry - UnregisterGraphicClass works
+    // via InheritsFrom and would remove the TPNGGraphic converter entry too
+    if Assigned(GetFileFormats) and (GetFileFormats() <> nil) then
+      GetFileFormats().RemoveExactClass(TPngImage)
+    else
+    begin
+      TPicture.UnregisterGraphicClass(TPngImage);
+      if IsActive then // re-register the converter the line above removed
+        TPicture.RegisterFileFormat('', 'Portable network graphics (AlphaControls)', TPNGGraphic);
+    end;
+  end;
+end;
+
+procedure SetIDEPngSupportActive(Active: Boolean);
+begin
+  if Active <> IsPngSupportActive then
+  begin
+    IsPngSupportActive := Active;
+    UpdatePngImageRegistration;
+  end;
+end;
+{$ENDIF}
 
 procedure SetFixAlphaControlsPNGActive(Active: Boolean);
 begin
@@ -187,24 +275,12 @@ begin
   begin
     IsActive := Active;
     if Active then
-    begin
-      {$IFNDEF COMPILER12_UP}
-      // pre-2009 IDEs have no native pngimage: also provide the statically
-      // linked TPngImage (repo copy in Shared\PNGDelphi, built with
-      // -DDDEV_PNG_NOINIT so it does NOT self-register), so 'png' files load
-      // properly and the DFMs written by our converter (class name
-      // 'TPngImage') stream back in
-      TPicture.RegisterFileFormat('png', 'Portable Network Graphics', TPngImage);
-      {$ENDIF}
-      TPicture.RegisterFileFormat('', 'Portable network graphics (AlphaControls)', TPNGGraphic);
-    end
+      TPicture.RegisterFileFormat('', 'Portable network graphics (AlphaControls)', TPNGGraphic)
     else
-    begin
       TPicture.UnregisterGraphicClass(TPNGGraphic);
-      {$IFNDEF COMPILER12_UP}
-      TPicture.UnregisterGraphicClass(TPngImage);
-      {$ENDIF}
-    end;
+    {$IFNDEF COMPILER12_UP}
+    UpdatePngImageRegistration;
+    {$ENDIF}
   end;
 end;
 

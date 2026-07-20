@@ -1,9 +1,9 @@
 inherited FrameOptionPageFormDesigner: TFrameOptionPageFormDesigner
   Width = 372
-  Height = 210
+  Height = 231
   inherited pnlClient: TPanel
     Width = 372
-    Height = 161
+    Height = 182
     object cbxActive: TCheckBox
       Left = 8
       Top = 8
@@ -60,6 +60,14 @@ inherited FrameOptionPageFormDesigner: TFrameOptionPageFormDesigner
       Height = 17
       Caption = 'Prefer proper PNG over AlphaControls (registration order)'
       TabOrder = 6
+    end
+    object chkIDEPngSupport: TCheckBox
+      Left = 24
+      Top = 156
+      Width = 340
+      Height = 17
+      Caption = 'Provide PNG support in the IDE (bundled pngimage, pre-2009)'
+      TabOrder = 7
     end
   end
   inherited pnlDescription: TPanel

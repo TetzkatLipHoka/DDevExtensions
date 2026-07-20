@@ -27,6 +27,7 @@ type
     FRemoveTextHeightProperty: Boolean;
     FFixAlphaControlsPNG: Boolean;
     FPreferProperPNG: Boolean;
+    FIDEPngSupport: Boolean;
     procedure SetActive(const Value: Boolean);
     procedure SetLabelMargin(const Value: Boolean);
     procedure SetRemoveExplicitProperty(const Value: Boolean);
@@ -34,6 +35,7 @@ type
     procedure SetRemoveTextHeightProperty(const Value: Boolean);
     procedure SetFixAlphaControlsPNG(const Value: Boolean);
     procedure SetPreferProperPNG(const Value: Boolean);
+    procedure SetIDEPngSupport(const Value: Boolean);
   protected
     function GetOptionPages: TTreePage; override;
     procedure Init; override;
@@ -49,6 +51,7 @@ type
     property RemoveTextHeightProperty: Boolean read FRemoveTextHeightProperty write SetRemoveTextHeightProperty;
     property FixAlphaControlsPNG : Boolean read FFixAlphaControlsPNG write SetFixAlphaControlsPNG;
     property PreferProperPNG: Boolean read FPreferProperPNG write SetPreferProperPNG;
+    property IDEPngSupport: Boolean read FIDEPngSupport write SetIDEPngSupport;
   end;
 
   TFrameOptionPageFormDesigner = class(TFrameBase, ITreePageComponent)
@@ -59,6 +62,7 @@ type
     chkRemoveTextHeightProperty: TCheckBox;
     chkFixAlphaControlsPNG: TCheckBox;
     chkPreferProperPNG: TCheckBox;
+    chkIDEPngSupport: TCheckBox;
     procedure cbxActiveClick(Sender: TObject);
   private
     { Private-Deklarationen }
@@ -114,6 +118,7 @@ begin
   chkRemoveTextHeightProperty.Enabled := {$IFDEF DELPHI28_UP}cbxActive.Checked{$ELSE}False{$ENDIF};
   chkFixAlphaControlsPNG.Enabled := {$IFDEF INCLUDE_ACPNGFIX}cbxActive.Checked{$ELSE}False{$ENDIF};
   chkPreferProperPNG.Enabled := cbxActive.Checked;
+  chkIDEPngSupport.Enabled := {$IF Defined(INCLUDE_ACPNGFIX) and not Defined(COMPILER12_UP)}cbxActive.Checked{$ELSE}False{$IFEND};
 end;
 
 procedure TFrameOptionPageFormDesigner.SetUserData(UserData: TObject);
@@ -130,6 +135,7 @@ begin
   chkRemoveTextHeightProperty.Checked := FFormDesigner.RemoveTextHeightProperty;
   chkFixAlphaControlsPNG.Checked := FFormDesigner.FixAlphaControlsPNG;
   chkPreferProperPNG.Checked := FFormDesigner.PreferProperPNG;
+  chkIDEPngSupport.Checked := FFormDesigner.IDEPngSupport;
 
   cbxActiveClick(cbxActive);
 end;
@@ -142,6 +148,7 @@ begin
   FFormDesigner.RemoveTextHeightProperty := chkRemoveTextHeightProperty.Checked;
   FFormDesigner.FixAlphaControlsPNG := chkFixAlphaControlsPNG.Checked;
   FFormDesigner.PreferProperPNG := chkPreferProperPNG.Checked;
+  FFormDesigner.IDEPngSupport := chkIDEPngSupport.Checked;
 
   FFormDesigner.Active := cbxActive.Checked;
   FFormDesigner.Save;
@@ -177,6 +184,7 @@ begin
   RemoveTextHeightProperty := False;
   FixAlphaControlsPNG := True;
   PreferProperPNG := False;
+  IDEPngSupport := False;
   Active := True;
 end;
 
@@ -249,6 +257,16 @@ begin
   end;
 end;
 
+procedure TFormDesigner.SetIDEPngSupport(const Value: Boolean);
+begin
+  if Value <> FIDEPngSupport then
+  begin
+    FIDEPngSupport := Value;
+    if Active then
+      UpdateHooks;
+  end;
+end;
+
 procedure TFormDesigner.UpdateHooks;
 begin
   {$IFDEF INCLUDE_FORMDESIGNER}
@@ -260,6 +278,9 @@ begin
 
   {$IFDEF INCLUDE_ACPNGFIX}
   SetFixAlphaControlsPNGActive(Active and FixAlphaControlsPNG);
+  {$IF not Defined(COMPILER12_UP)}
+  SetIDEPngSupportActive(Active and IDEPngSupport);
+  {$IFEND}
   {$ENDIF}
 
   SetPreferProperPNGActive(Active and PreferProperPNG);

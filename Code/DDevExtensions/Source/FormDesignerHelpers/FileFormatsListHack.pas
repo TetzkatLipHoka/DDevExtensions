@@ -39,6 +39,7 @@ type
     function  FindExt( Ext: string ): TGraphicClass;
     function  FindClassName( const ClassName: string ): TGraphicClass;
     procedure Remove( AClass: TGraphicClass );
+    procedure RemoveExactClass( AClass: TGraphicClass ); // = only, no InheritsFrom
     procedure RemoveByName( ClassName : string );
     procedure RemoveByExt( Ext : string );
     procedure RemoveByDescription( Description : string );
@@ -139,6 +140,24 @@ begin
   begin
     P := PFileFormat(Items[I]);
     if P^.GraphicClass.InheritsFrom(AClass) then
+    begin
+      Dispose(P);
+      Delete(I);
+    end;
+  end;
+end;
+
+// unlike Remove, this matches the exact class only - entries of DESCENDANT
+// classes (e.g. a converter subclassing the removed graphic class) survive
+procedure TFileFormatsListHack.RemoveExactClass( AClass: TGraphicClass );
+var
+  I: Integer;
+  P: PFileFormat;
+begin
+  for I := Count-1 downto 0 do
+  begin
+    P := PFileFormat(Items[I]);
+    if P^.GraphicClass = AClass then
     begin
       Dispose(P);
       Delete(I);

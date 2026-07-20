@@ -13,13 +13,15 @@ is logged before mutating). The list is reached via
 — D7 rejects dotted unit names).
 
 The `FixAlphaControlsPNG` DFM-converter is **enabled** (`INCLUDE_ACPNGFIX` defined,
-2026-07-20) and no longer 2009-gated: on pre-2009 IDEs the D7 build statically links the
-patched PNGDelphi (`C:\Delphi\7\TLH\Packages\PNGDelphi\source`, path in `build_d7.bat`).
-Its self-registration is undone immediately in the unit initialization; the checkbox then
-registers/unregisters the bundled `TPngImage` (ext 'png') plus the `TPNGGraphic` converter,
-so IDEs with only a retail pngimage (or none) still get working acPNG conversion and PNG
-round-tripping. An installed pngimage PACKAGE is never touched (UnregisterGraphicClass
-works via InheritsFrom on a different class tree).
+2026-07-20) and no longer 2009-gated: pre-2009 IDEs statically link the patched PNGDelphi
+from the repo copy in `Shared/PNGDelphi/` (pngimage.pas + pnglang.pas; zlib comes from the
+Delphi 7 Lib). The copy carries a `DDEV_PNG_NOINIT` switch around its `RegisterGraphic`
+define — both D7 build scripts pass `-DDDEV_PNG_NOINIT`, so the unit compiles WITHOUT
+initialization-time self-registration and the option checkbox alone decides: when active,
+pre-2009 registers the bundled `TPngImage` (ext 'png') plus the `TPNGGraphic` converter,
+so IDEs with only a retail pngimage (TPNGObject era, no converter) — or none at all — get
+working acPNG conversion and PNG round-tripping. An installed pngimage PACKAGE is never
+touched (UnregisterGraphicClass works via InheritsFrom on a different class tree).
 
 ## Background / the problem
 - **Delphi 7 has no native `pngimage`.** AlphaControls silently ships its own **acPNG** to

@@ -190,8 +190,10 @@ begin
     begin
       {$IFNDEF COMPILER12_UP}
       // pre-2009 IDEs have no native pngimage: also provide the statically
-      // linked TPngImage, so 'png' files load properly and the DFMs written
-      // by our converter (class name 'TPngImage') stream back in
+      // linked TPngImage (repo copy in Shared\PNGDelphi, built with
+      // -DDDEV_PNG_NOINIT so it does NOT self-register), so 'png' files load
+      // properly and the DFMs written by our converter (class name
+      // 'TPngImage') stream back in
       TPicture.RegisterFileFormat('png', 'Portable Network Graphics', TPngImage);
       {$ENDIF}
       TPicture.RegisterFileFormat('', 'Portable network graphics (AlphaControls)', TPNGGraphic);
@@ -205,17 +207,6 @@ begin
     end;
   end;
 end;
-
-{$IFNDEF COMPILER12_UP}
-initialization
-  // The statically linked pngimage registers its TPngImage (and its own
-  // TPNGGraphic converter) in its unit initialization as soon as this DLL
-  // loads. Undo that right away - the option checkbox decides. A pngimage
-  // PACKAGE installed in the IDE is untouched: UnregisterGraphicClass removes
-  // by InheritsFrom, and the package's classes belong to a different class
-  // tree than this DLL's statically linked copies.
-  TPicture.UnregisterGraphicClass(TPngImage);
-{$ENDIF}
 
 {$ENDIF}
 

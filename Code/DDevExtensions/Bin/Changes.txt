@@ -8,6 +8,7 @@ Version: 2.90
 - Added: IDE-Theme
 - Added: TPNGGraphic (acPNG) to TPngImage converter (all versions; pre-2009 also registers a bundled TPngImage)
 - Added: "Prefer proper PNG over AlphaControls" - arbitrates the VCL graphic-format registration order so the proper TPNGGraphic wins over acPNG's fake PNG
+- Added: "Provide PNG support in the IDE" - registers the bundled pngimage on pre-2009 IDEs that have no PNG package installed
 
 Version: 2.89
 =============

@@ -13,7 +13,12 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, CheckLst, Registry, ShlObj, ActiveX, AppConsts,
-  ExtCtrls, ComCtrls;
+  ExtCtrls, ComCtrls
+  {$IF CompilerVersion > 30}
+  ,Vcl.Themes
+  ,Vcl.Styles
+  {$IFEND}    
+  ;
 
 type
   TEnvKind = ({ekDelphi5, ekBCB5, ekDelphi6, ekBCB6, ekDelphi7,
@@ -66,6 +71,11 @@ const
     (Version: 'D120'; IDEName: 'RAD Studio 12.0'; Key: 'Embarcadero\BDS\23.0'),
     (Version: 'D130'; IDEName: 'RAD Studio 13.0'; Key: 'Embarcadero\BDS\37.0')
   );
+  
+{$IF CompilerVersion > 30}
+const
+  THEME_NAME = 'Windows10 SlateGray';
+{$IFEND}      
 
 type
   TFormMain = class(TForm)
@@ -90,6 +100,7 @@ type
     procedure UninstallFile(const InstallDir, FileName: string);
     procedure UnregisterExpert(const EnvData: TEnvData; const Name: string);
     function HasExpert(const EnvData: TEnvData; const Name: string): Boolean;
+    function IsDarkMode: Boolean;
 
     procedure DoInstall(const EnvData: TEnvData);
     procedure DoUninstall(const EnvData: TEnvData);
@@ -266,6 +277,11 @@ begin
        cbxEnvs.Checked[i] := True;
 
   pbProgress.Max := cbxEnvs.Items.Count;
+
+  {$IF CompilerVersion > 30}
+  if IsDarkMode then
+    TStyleManager.TrySetStyle(THEME_NAME, False);
+  {$IFEND}    
 end;
 
 procedure TFormMain.InstallFile(const InstallDir, FileName: string; Force: Boolean);
@@ -349,6 +365,29 @@ begin
     Reg.RootKey := HKEY_CURRENT_USER;
     if Reg.OpenKeyReadOnly('\Software\' + EnvData.Key + '\Experts') then
       Result := Reg.ValueExists(Name)
+    else
+      Result := False;
+  finally
+    Reg.Free;
+  end;
+end;
+
+function TFormMain.IsDarkMode: Boolean;
+var
+  Reg: TRegistry;
+begin
+  Result := False;
+  Reg := TRegistry.Create;
+  try
+    Reg.RootKey := HKEY_CURRENT_USER;
+    if Reg.OpenKeyReadOnly('\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize\') then begin
+      try
+        if Reg.ValueExists('AppsUseLightTheme') then
+          Result := Reg.ReadInteger('AppsUseLightTheme') = 0;
+      finally
+        Reg.CloseKey;
+      end;
+    end
     else
       Result := False;
   finally

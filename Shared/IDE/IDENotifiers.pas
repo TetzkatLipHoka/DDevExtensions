@@ -41,7 +41,11 @@ type
 implementation
 
 type
+  {$IF CompilerVersion < 21.0} // Delphi 2009
+  TIDENotifierList = class(TComponent, IOTANotifier, IOTAIDENotifier, IOTAIDENotifier50)
+  {$ELSE}
   TIDENotifierList = class(TComponent, IOTANotifier, IOTAIDENotifier80, IOTAIDENotifier, IOTAIDENotifier50)
+  {$IFEND}
   private
     FId: Integer;
     FNotifiers: TList;

@@ -76,9 +76,13 @@ cd ..
 del bin\DDevExtensionsReg.map bin\DDevExtensionsReg.drc
 echo.
 
+::BUILD
+
+:D130
 echo.
 echo === Delphi 13.0 ==============================
 call "C:\Program Files (x86)\Embarcadero\Studio\37.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto D120
 
 cd D_D130
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -88,8 +92,11 @@ if exist "%LINKMAPFILE%" "%LINKMAPFILE%" bin\DDevExtensionsD130.dll
 del bin\DDevExtensionsD130.map bin\DDevExtensions.drc
 echo.
 
+:D120
+echo.
 echo === Delphi 12.0 ==============================
 call "C:\Program Files (x86)\Embarcadero\Studio\23.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto D110
 
 cd D_D120
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -99,9 +106,11 @@ if exist "%LINKMAPFILE%" "%LINKMAPFILE%" bin\DDevExtensionsD120.dll
 del bin\DDevExtensionsD120.map bin\DDevExtensions.drc
 echo.
 
+:D110
 echo.
 echo === Delphi 11.0 ==============================
 call "C:\Program Files (x86)\Embarcadero\Studio\22.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto D104
 
 cd D_D110
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -111,9 +120,11 @@ if exist "%LINKMAPFILE%" "%LINKMAPFILE%" bin\DDevExtensionsD110.dll
 del bin\DDevExtensionsD110.map bin\DDevExtensions.drc
 echo.
 
+:D104
 echo.
 echo === Delphi 10.4 ==============================
 call "C:\Program Files (x86)\Embarcadero\Studio\21.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto D103
 
 cd D_D104
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -123,9 +134,11 @@ if exist "%LINKMAPFILE%" "%LINKMAPFILE%" bin\DDevExtensionsD104.dll
 del bin\DDevExtensionsD104.map bin\DDevExtensions.drc
 echo.
 
+:D103
 echo.
 echo === Delphi 10.3 ==============================
 call "C:\Program Files (x86)\Embarcadero\Studio\20.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto D102
 
 cd D_D103
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -135,10 +148,11 @@ if exist "%LINKMAPFILE%" "%LINKMAPFILE%" bin\DDevExtensionsD103.dll
 del bin\DDevExtensionsD103.map bin\DDevExtensions.drc
 echo.
 
-
+:D102
 echo.
 echo === Delphi 10.2 ==============================
 call "C:\Program Files (x86)\Embarcadero\Studio\19.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto D101
 
 cd D_D102
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -148,10 +162,11 @@ if exist "%LINKMAPFILE%" "%LINKMAPFILE%" bin\DDevExtensionsD102.dll
 del bin\DDevExtensionsD102.map bin\DDevExtensions.drc
 echo.
 
-
+:D101
 echo.
 echo === Delphi 10.1 Berlin ==============================
 call "C:\Program Files (x86)\Embarcadero\Studio\18.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto D10
 
 cd D_D101
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -161,10 +176,11 @@ if exist "%LINKMAPFILE%" "%LINKMAPFILE%" bin\DDevExtensionsD101.dll
 del bin\DDevExtensionsD101.map bin\DDevExtensions.drc
 echo.
 
-
+:D10
 echo.
 echo === Delphi 10 Seattle ==============================
 call "C:\Program Files (x86)\Embarcadero\Studio\17.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto DXE8
 
 cd D_D10
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -174,9 +190,11 @@ if exist "%LINKMAPFILE%" "%LINKMAPFILE%" bin\DDevExtensionsD10.dll
 del bin\DDevExtensionsD10.map bin\DDevExtensions.drc
 echo.
 
+:DXE8
 echo.
 echo === Delphi XE8 ==============================
 call "C:\Program Files (x86)\Embarcadero\Studio\16.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto DXE7
 
 cd D_XE8
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -186,10 +204,11 @@ if exist "%LINKMAPFILE%" "%LINKMAPFILE%" bin\DDevExtensionsXE8.dll
 del bin\DDevExtensionsXE8.map bin\DDevExtensions.drc
 echo.
 
-
+:DXE7
 echo.
 echo === Delphi XE7 ==============================
 call "C:\Program Files (x86)\Embarcadero\Studio\15.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto DXE6
 
 cd D_XE7
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -199,10 +218,11 @@ if exist "%LINKMAPFILE%" "%LINKMAPFILE%" bin\DDevExtensionsXE7.dll
 del bin\DDevExtensionsXE7.map bin\DDevExtensions.drc
 echo.
 
-
+:DXE6
 echo.
 echo === Delphi XE6 ==============================
 call "C:\Program Files (x86)\Embarcadero\Studio\14.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto DXE5
 
 cd D_XE6
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -212,10 +232,11 @@ if exist "%LINKMAPFILE%" "%LINKMAPFILE%" bin\DDevExtensionsXE6.dll
 del bin\DDevExtensionsXE6.map bin\DDevExtensions.drc
 echo.
 
-
+:DXE5
 echo.
 echo === Delphi XE5 ==============================
 call "C:\Program Files (x86)\Embarcadero\RAD Studio\12.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto DXE4
 
 cd D_XE5
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -225,10 +246,11 @@ if exist "%LINKMAPFILE%" "%LINKMAPFILE%" bin\DDevExtensionsXE5.dll
 del bin\DDevExtensionsXE5.map bin\DDevExtensions.drc
 echo.
 
-
+:DXE4
 echo.
 echo === Delphi XE4 ==============================
 call "C:\Program Files (x86)\Embarcadero\RAD Studio\11.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto DXE3
 
 cd D_XE4
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -238,10 +260,11 @@ if exist "%LINKMAPFILE%" "%LINKMAPFILE%" bin\DDevExtensionsXE4.dll
 del bin\DDevExtensionsXE4.map bin\DDevExtensions.drc
 echo.
 
-
+:DXE3
 echo.
 echo === Delphi XE3 ==============================
 call "C:\Program Files (x86)\Embarcadero\RAD Studio\10.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto DXE2
 
 cd D_XE3
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -251,10 +274,11 @@ if exist "%LINKMAPFILE%" "%LINKMAPFILE%" bin\DDevExtensionsXE3.dll
 del bin\DDevExtensionsXE3.map bin\DDevExtensions.drc
 echo.
 
-
+:DXE2
 echo.
 echo === Delphi XE2 ==============================
 call "C:\Program Files (x86)\Embarcadero\RAD Studio\9.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto DXE
 
 cd D_XE2
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -264,10 +288,11 @@ if exist "%LINKMAPFILE%" "%LINKMAPFILE%" bin\DDevExtensionsXE2.dll
 del bin\DDevExtensionsXE2.map bin\DDevExtensions.drc
 echo.
 
-
+:DXE
 echo.
 echo === Delphi XE ==============================
 call "C:\Program Files (x86)\Embarcadero\RAD Studio\8.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto D2010
 
 cd D_XE
 msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
@@ -277,26 +302,30 @@ if exist "%LINKMAPFILE%" "%LINKMAPFILE%" bin\DDevExtensionsXE.dll
 del bin\DDevExtensionsXE.map bin\DDevExtensions.drc
 echo.
 
-
+:D2010
 echo.
 echo === Delphi 2010 ============================
 call "C:\Program Files (x86)\Embarcadero\RAD Studio\7.0\bin\rsvars.bat"
+if ERRORLEVEL 1 goto D2009
 
 cd D_2010
-msbuild /nologo /t:Build /p:Config=Release DDevExtensions2010.dproj
+msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
+::msbuild /nologo /t:Build /p:Config=Release DDevExtensions2010.dproj
 if ERRORLEVEL 1 goto Error1
 cd ..
 if exist "%LINKMAPFILE%" "%LINKMAPFILE%" bin\DDevExtensions2010.dll
 del bin\DDevExtensions2010.map bin\DDevExtensions2010.drc
 echo.
 
-
+:D2009
 echo.
 echo === Delphi 2009 ============================
-call "C:\CodeGear\RAD Studio\6.0\bin\rsvars.bat"
+call "C:\Program Files (x86)\CodeGear\RAD Studio\6.0\bin\rsvars.bat"
+::if ERRORLEVEL 1 goto D
 
 cd D_2009
-msbuild /nologo /t:Build /p:Config=Release DDevExtensions2009.dproj
+msbuild /nologo /t:Build /p:Config=Release DDevExtensions.dproj
+::msbuild /nologo /t:Build /p:Config=Release DDevExtensions2009.dproj
 if ERRORLEVEL 1 goto Error1
 cd ..
 if exist "%LINKMAPFILE%" "%LINKMAPFILE%" bin\DDevExtensions2009.dll
@@ -305,6 +334,8 @@ echo.
 
 
 echo === Packaging ==============================
+echo Press to continue
+pause
 
 echo DDevExtensions Version %majorversion%.%minorversion%>bin\Version.txt
 if "%fileversion%#" == "Dev#" echo %versioninfo%>>bin\Version.txt

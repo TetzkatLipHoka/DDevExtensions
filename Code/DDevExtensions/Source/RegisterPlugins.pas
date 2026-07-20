@@ -18,9 +18,9 @@ implementation
 
 uses
   SysUtils, Classes, Main,
-  {$IF CompilerVersion < 21.0} // Delphi 2009
-  ProjectMgrShortCuts,
-  {$IFEND}
+//  {$IF CompilerVersion < 21.0} // Delphi 2009 // MS not avail
+//  ProjectMgrShortCuts,
+//  {$IFEND}
   FrmeOptionPageFormDesigner,
   FrmProjectSettingsSetVersioninfo, FocusEditor, CompileProgress,
   IDEMenuHandler, FrmeOptionPageKeybindings,

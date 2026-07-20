@@ -1,4 +1,4 @@
-﻿{******************************************************************************}
+{******************************************************************************}
 {*                                                                            *}
 {* DDevExtensions                                                             *}
 {*                                                                            *}
@@ -15,7 +15,7 @@ const
 
   sPluginVersion = VersionNumber;
   sPluginName = 'DDevExtensions ' + sPluginVersion;
-  sPluginSmallCopyright = '(C) 2006-2020 Andreas Hausladen';
+  sPluginSmallCopyright = '(C) 2006-2025 Andreas Hausladen';
   sPluginCopyright = 'Copyright ' + sPluginSmallCopyright;
 
 resourcestring

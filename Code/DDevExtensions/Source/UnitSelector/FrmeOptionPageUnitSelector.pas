@@ -20,12 +20,12 @@ uses
 type
   TUnitSelectorConfig = class(TPluginConfig)
   private
-    {$IF CompilerVersion < 21.0} // Delphi 2009
+    {$IF Defined(FrmUnitSelector) AND ( CompilerVersion < 21.0 )} // Delphi 2009
     FActive: Boolean;
     {$IFEND}
     FFindUseUnitHotKey: TShortCut;
     FReplaceUseUnit: Boolean;
-    {$IF CompilerVersion < 21.0} // Delphi 2009
+    {$IF Defined(FrmUnitSelector) AND ( CompilerVersion < 21.0 )} // Delphi 2009
     procedure SetActive(const Value: Boolean);
     {$IFEND}
     procedure SetFindUseUnitHotKey(const Value: TShortCut);
@@ -37,7 +37,7 @@ type
     constructor Create;
     destructor Destroy; override;
   published
-    {$IF CompilerVersion < 21.0} // Delphi 2009
+    {$IF Defined(FrmUnitSelector) AND ( CompilerVersion < 21.0 )} // Delphi 2009
     property Active: Boolean read FActive write SetActive;
     {$IFEND}
     property ReplaceUseUnit: Boolean read FReplaceUseUnit write SetReplaceUseUnit;
@@ -68,8 +68,9 @@ procedure InitPlugin(Unload: Boolean);
 
 implementation
 
+{.$DEFINE FrmUnitSelector} // MS
 uses
-  {$IF CompilerVersion < 21.0} // Delphi 2009
+  {$IF Defined(FrmUnitSelector) AND ( CompilerVersion < 21.0 )} // Delphi 2009
   FrmUnitSelector,
   {$IFEND}
   Hooking, IDEHooks, IDEUtils, Main, IDEMenuHandler,
@@ -84,7 +85,7 @@ var
   HookTDelphiCommands_FileUseUnitCommandExecute: TRedirectCode;
   TDelphiCommands_FileUseUnitCommandExecute: procedure(Self: TObject; Sender: TObject) = nil;
 
-{$IF CompilerVersion < 21.0} // Delphi 2009
+{$IF Defined(FrmUnitSelector) AND ( CompilerVersion < 21.0 )} // Delphi 2009
 var
   HookTViewDialog_Execute: TRedirectCode;
 //  HookTViewDialog_Create: TRedirectCode;
@@ -205,7 +206,7 @@ end;
 
 destructor TUnitSelectorConfig.Destroy;
 begin
-  {$IF CompilerVersion < 21.0} // Delphi 2009
+  {$IF Defined(FrmUnitSelector) AND ( CompilerVersion < 21.0 )} // Delphi 2009
   Active := False;
   {$IFEND}
   ReplaceUseUnit := False;
@@ -215,7 +216,7 @@ end;
 procedure TUnitSelectorConfig.Init;
 begin
   inherited Init;
-  {$IF CompilerVersion < 21.0} // Delphi 2009
+  {$IF Defined(FrmUnitSelector) AND ( CompilerVersion < 21.0 )} // Delphi 2009
   Active := True;
   {$IFEND}
   //FindUseUnitHotKey := Menus.ShortCut(Ord('U'), [ssCtrl, ssAlt]);
@@ -228,7 +229,7 @@ begin
   Result := TTreePage.Create('Find Unit/Use Unit', TFrameOptionPageUnitSelector, Self);
 end;
 
-{$IF CompilerVersion < 21.0} // Delphi 2009
+{$IF Defined(FrmUnitSelector) AND ( CompilerVersion < 21.0 )} // Delphi 2009
 procedure TUnitSelectorConfig.SetActive(const Value: Boolean);
 begin
   if Value <> FActive then
@@ -288,7 +289,7 @@ end;
 
 procedure TFrameOptionPageUnitSelector.LoadData;
 begin
-  {$IF CompilerVersion < 21.0} // Delphi 2009
+  {$IF Defined(FrmUnitSelector) AND ( CompilerVersion < 21.0 )} // Delphi 2009
   cbxUseUnitSelector.Checked := FUnitSelectorConfig.Active;
   {$ELSE}
   cbxUseUnitSelector.Free;
@@ -301,7 +302,7 @@ procedure TFrameOptionPageUnitSelector.SaveData;
 begin
   FUnitSelectorConfig.FindUseUnitHotKey := hkFindUseUnit.HotKey;
   FUnitSelectorConfig.ReplaceUseUnit := chkReplaceUseUnit.Checked;
-  {$IF CompilerVersion < 21.0} // Delphi 2009
+  {$IF Defined(FrmUnitSelector) AND ( CompilerVersion < 21.0 )} // Delphi 2009
   FUnitSelectorConfig.Active := cbxUseUnitSelector.Checked;
   {$IFEND}
   FUnitSelectorConfig.Save;

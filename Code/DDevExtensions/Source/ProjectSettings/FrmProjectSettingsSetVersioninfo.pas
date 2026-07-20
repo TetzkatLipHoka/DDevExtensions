@@ -805,7 +805,7 @@ begin
 end;
 
 procedure TFormProjectSettingsSetVersioninfo.FormCreate(Sender: TObject);
-begin
+begin 
   FIcon := TIconResource.Create;
   dtpStartDay.Date := Date;
   pgcPages.ActivePageIndex := 0;

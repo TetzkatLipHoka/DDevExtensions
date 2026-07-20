@@ -9,6 +9,9 @@ unit Hooking;
 // Don't ever activate them here. This unit depends on pointer arithmetic with Integer overflows.
 {$RANGECHECKS OFF}
 
+{$WARN UNSAFE_CODE OFF}
+{$WARN UNSAFE_TYPE OFF}
+
 interface
 
 {$IF CompilerVersion >= 23.0} // XE2+
@@ -64,7 +67,7 @@ procedure EnableFindMethodPtrDllVirtualQueryCache(Enable: Boolean);
 
 type
   POffsetTable = ^TOffsetTable;
-  TOffsetTable = record
+  TOffsetTable = {$IFDEF UNICODE}record{$ELSE}object{$ENDIF}
   public
     Offsets: array of PInteger;
     procedure Add(P: PInteger);
@@ -524,7 +527,7 @@ begin
     if RegionSize = 0 then
       Break;
 
-    if FindOtherBytesPtr(P + 1, Bytes, BytesLen) then
+    if FindOtherBytesPtr(PByte( PAnsiChar( P ) + 1 ), Bytes, BytesLen) then
     begin
       Result := P;
       Exit;
@@ -663,12 +666,13 @@ function ModRmSize(P: PByte): Integer;
 var
   ModRm: Byte;
 begin
-  ModRm := P[0];
+  ModRm := P^;
+  Inc( P );
   if ModRm >= $C0 then
     Result := 1 // ModRm
   else if ModRm and $07 = $04 then
   begin
-    if P[1] and $07 = $05 then // SIB
+    if P^{[1]} and $07 = $05 then // SIB
     begin
       if ModRm and $C0 = $40 then
         Result := 3 // 1 + 1 + 1 // ModRm + SIB + Byte displacement
@@ -1051,7 +1055,7 @@ begin
         begin
           Size := 1 + 4;
           if OffsetTable <> nil then
-            OffsetTable.Add(PInteger(Code + 1));
+            OffsetTable.Add(PInteger(PAnsiChar( Code ) + 1));
         end;
 
       $F6:
@@ -1093,7 +1097,7 @@ function CreateOrgCallMethodPtr(Proc: Pointer): Pointer;
 const
   BlockSize = 4096;
 var
-  P: PByte;
+  P: PAnsiChar;
   StartCodeSize, CodeSize, FullCodeSize: Integer;
   I: Integer;
   JmpRelOffset: Integer;
@@ -1119,7 +1123,7 @@ begin
   if (OrgCallBlock = nil) or (OrgCallBlockOffset + FullCodeSize > BlockSize) then
   begin
     // Append the next block, if possible.
-    P := OrgCallBlock;
+    P := PAnsiChar( OrgCallBlock );
     if P <> nil then
     begin
       //VirtualProtect(P, BlockSize, PAGE_EXECUTE_READ, @Dummy);
@@ -1134,9 +1138,9 @@ begin
   end;
 
   {$IF CompilerVersion >= 20.0}
-  P := OrgCallBlock + OrgCallBlockOffset;
+  P := PAnsiChar(OrgCallBlock + OrgCallBlockOffset);
   {$ELSE}
-  P := PByte(PAnsiChar(OrgCallBlock) + OrgCallBlockOffset);
+  P := PAnsiChar(PAnsiChar(OrgCallBlock) + OrgCallBlockOffset);
   {$IFEND}
   Inc(OrgCallBlockOffset, FullCodeSize);
   //LeaveCriticalSection(OrgCallBlockCritSect);
@@ -1145,12 +1149,12 @@ begin
   Move(Proc^, P^, StartCodeSize);
   if OffsetTable.Offsets <> nil then // in 5 bytes only 1 call/jmp can be in it
   begin
-    RelPos := PByte(OffsetTable.Offsets[0]) - PByte(Proc);
+    RelPos := PByte(OffsetTable.Offsets[0]) - PAnsiChar(Proc);
     PInteger(P + RelPos)^ := (PByte(Proc) - P) + OffsetTable.Offsets[0]^;
   end;
 
-  P[JmpRelOffset] := $E9;
-  PInteger(@P[JmpRelOffset + 1])^ := (PByte(Proc) + StartCodeSize) - (P + JmpRelOffset + 5);
+  P[JmpRelOffset] := char( $E9 );
+  PInteger(@P[JmpRelOffset + 1])^ := (PAnsiChar(Proc) + StartCodeSize) - (P + JmpRelOffset + 5);
   // Fill gab
   for I := CodeSize to FullCodeSize - 1 do
     Byte(PAnsiChar(P)[I]) := $CC; // int 3
@@ -1209,8 +1213,8 @@ begin
   begin
     // Adjust the relative address to the original code position
     Move(OrgCall^, Buffer[0], StartCodeSize);
-    RelPos := PByte(OffsetTable.Offsets[0]) - PByte(OrgCall);
-    PInteger(@Buffer[RelPos])^ := OffsetTable.Offsets[0]^ - (PByte(OrgProc) - PByte(OrgCall));
+    RelPos := PByte(OffsetTable.Offsets[0]) - PAnsiChar(OrgCall);
+    PInteger(@Buffer[RelPos])^ := OffsetTable.Offsets[0]^ - (PAnsiChar(OrgProc) - PAnsiChar(OrgCall));
     WriteProcessMemory(GetCurrentProcess, OrgProc, @Buffer, StartCodeSize, n);
   end
   else
@@ -1250,8 +1254,8 @@ begin
   begin
     if Result <> NewFunction then
     begin
-      Offset := PByte(NewFunction) - (CallJmpPtr + 5);
-      if not WriteProcessMemory(GetCurrentProcess, @CallJmpPtr[1], @Offset, SizeOf(Offset), n) then
+      Offset := PAnsiChar(NewFunction) - (PAnsiChar(CallJmpPtr) + 5);
+      if not WriteProcessMemory(GetCurrentProcess, PAnsiChar(CallJmpPtr) + 1, @Offset, SizeOf(Offset), n) then
         Result := nil;
     end;
   end
@@ -1262,7 +1266,7 @@ end;
 function GetCallTargetAddress(CallJmpPtr: PByte): Pointer;
 begin
   if (CallJmpPtr <> nil) and (CallJmpPtr^ in [$E8, $E9]) then
-    Result := Pointer(PByte(CallJmpPtr + 5) + PInteger(@CallJmpPtr[1])^)
+    Result := Pointer((PAnsiChar(CallJmpPtr) + 5) + PInteger(PAnsiChar(CallJmpPtr) + 1)^)
   else
     Result := nil;
 end;
@@ -1275,7 +1279,7 @@ begin
   if FiveByteStart <> nil then
   begin
     Buffer[0] := $E8;
-    PInteger(@Buffer[1])^ := PByte(CallFunction) - (FiveByteStart + 5);
+    PInteger(@Buffer[1])^ := PAnsiChar(CallFunction) - (PAnsiChar(FiveByteStart) + 5);
     Result := WriteProcessMemory(GetCurrentProcess, FiveByteStart, @Buffer, SizeOf(Buffer), n);
   end
   else
@@ -1292,7 +1296,7 @@ begin
   begin
     StartCodeSize := 5;
     Buffer[0] := $E9;
-    PInteger(@Buffer[1])^ := PByte(JumpTarget) - (FiveByteStart + 5);
+    PInteger(@Buffer[1])^ := PAnsiChar(JumpTarget) - (PAnsiChar(FiveByteStart) + 5);
     if FillWithNop then
     begin
       StartCodeSize := GetStartCodeSize(FiveByteStart, 5);
@@ -1394,31 +1398,31 @@ begin
   if Word(AWinApiProc^) = $FF8B then // "8B FF  mov edi,edi"
   begin
     AHookInfo.Mode := 1;
-    Move(Pointer(PByte(AWinApiProc) - 5)^, AHookInfo.Data[0], SizeOf(JmpCode));
+    Move(Pointer(PAnsiChar(AWinApiProc) - 5)^, AHookInfo.Data[0], SizeOf(JmpCode));
 
     JmpCode.Jump.Jmp := $E9; // jmp dword-const
-    JmpCode.Jump.Offset := PByte(ANewProc) - ((PByte(AWinApiProc) - 5) + 5);
+    JmpCode.Jump.Offset := PAnsiChar(ANewProc) - ((PAnsiChar(AWinApiProc) - 5) + 5);
     JmpCode.JmpM5 := $F9EB; // jmp $-5
 
     // Set OrgCallProc before changing the code so that concurrent threads can call the hook that can call the org function
-    Pointer(AOrgCallProc) := PByte(AWinApiProc) + 2;
-    if not WriteProcessMemory(GetCurrentProcess, PByte(AWinApiProc) - 5, @JmpCode, SizeOf(JmpCode), n) then
+    Pointer(AOrgCallProc) := PAnsiChar(AWinApiProc) + 2;
+    if not WriteProcessMemory(GetCurrentProcess, PAnsiChar(AWinApiProc) - 5, @JmpCode, SizeOf(JmpCode), n) then
     begin
       Pointer(AOrgCallProc) := nil;
       RaiseLastOSError;
     end;
   end
   else if (Word(AWinApiProc^) = $F9EB) and // "EB F9  jmp $-5"
-          (PByte(PByte(AWinApiProc) - 5)^ = $E9) then // "jmp dword-const"
+          (PByte(PAnsiChar(AWinApiProc) - 5)^ = $E9) then // "jmp dword-const"
   begin
     // already patched
-    P := GetCallTargetAddress(PByte(AWinApiProc) - 5);
+    P := GetCallTargetAddress(PByte(PAnsiChar(AWinApiProc) - 5));
     Pointer(AOrgCallProc) := P;
 
     AHookInfo.Mode := 2;
-    Move(Pointer(PByte(AWinApiProc) - 5)^, AHookInfo.Data[0], SizeOf(JmpCode.Jump));
+    Move(Pointer(PAnsiChar(AWinApiProc) - 5)^, AHookInfo.Data[0], SizeOf(JmpCode.Jump));
 
-    {Pointer(AOrgCallProc) :=} ReplaceRelCallOffset(PByte(AWinApiProc) - 5, ANewProc);
+    {Pointer(AOrgCallProc) :=} ReplaceRelCallOffset(PByte(PAnsiChar(AWinApiProc) - 5), ANewProc);
   end
   {$ENDIF CPUX64}
   else
@@ -1470,8 +1474,8 @@ begin
           end;
         end;
       {$ELSE}
-      1: Result := WriteProcessMemory(GetCurrentProcess, AHookInfo.WinApiProc - 5, @AHookInfo.Data[0], 5 + 2, n);
-      2: Result := WriteProcessMemory(GetCurrentProcess, AHookInfo.WinApiProc - 5, @AHookInfo.Data[0], 5, n);
+      1: Result := WriteProcessMemory(GetCurrentProcess, PAnsiChar(AHookInfo.WinApiProc) - 5, @AHookInfo.Data[0], 5 + 2, n);
+      2: Result := WriteProcessMemory(GetCurrentProcess, PAnsiChar(AHookInfo.WinApiProc) - 5, @AHookInfo.Data[0], 5, n);
       {$ENDIF CPUX64}
       3:
         begin

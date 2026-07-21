@@ -93,7 +93,9 @@ begin
   chkReleaseCompilerUnitCache.Enabled := False;
   chkReleaseCompilerUnitCacheHigh.Enabled := False;
   cbxDisableRebuildDlg.Enabled := False;
+  {$IFNDEF COMPILER7} // D7 implements "switch active project" via the ProjectMake hook
   chkAskBeforeCompilingFileFromDiffernetProject.Enabled := False;
+  {$ENDIF}
   {$IFEND}
 end;
 

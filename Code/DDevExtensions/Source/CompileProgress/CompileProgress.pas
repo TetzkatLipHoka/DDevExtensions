@@ -244,7 +244,7 @@ begin
       GlobalCompileProgress.EndCompileRun;
   end;
 end;
-{$ELSEIF CompilerVersion >= 20.0} // Delphi 2009
+{$ELSEIF (CompilerVersion >= 20.0) or Defined(COMPILER7)} // Delphi 2009 and Delphi 7: hook TAppBuilder.ProjectMake's call to CompileActiveProject
 var
   OrgCompileActiveProject, OrgCallCompileActiveProject: function(Instance: TObject; CompileMode: TCompileMode; Wait: Boolean): Boolean;
 
@@ -258,7 +258,8 @@ begin
 end;
 {$IFEND}
 
-{$IF CompilerVersion >= 20.0} // 2009+ (uses OTA project dependencies and IDE hooks not available before)
+{$IF (CompilerVersion >= 20.0) or Defined(COMPILER7)} // 2009+ and D7 (switch-active-project on compile)
+{$IFNDEF COMPILER7} // D7's ToolsAPI has no IOTAProjectGroupProjectDependencies - it just falls back to the plain active-project check below
 procedure CollectDependencies(const Dependencies: IOTAProjectGroupProjectDependencies;
   const DependentProjects: TInterfaceList; const Project: IOTAProject);
 var
@@ -275,6 +276,7 @@ begin
       CollectDependencies(Dependencies, DependentProjects, Prj);
   end;
 end;
+{$ENDIF ~COMPILER7}
 
 function CompileActiveProject(Instance: TObject; CompileMode: TCompileMode; Wait: Boolean): Boolean;
 const
@@ -284,10 +286,13 @@ var
   Project, ActiveProject: IOTAProject;
   I: Integer;
   Found: Boolean;
+  {$IFNDEF COMPILER7}
   Dependencies: IOTAProjectGroupProjectDependencies;
+  DependentProjects: TInterfaceList;
+  {$ENDIF}
   ModuleServices: IOTAModuleServices;
   Services: IOTAServices;
-  DependentProjects: TInterfaceList;
+  MainGroup: IOTAProjectGroup;
   DontShowAgain: Boolean;
   AutoClose, ConfigModified: Boolean;
 begin
@@ -298,9 +303,15 @@ begin
     Module := ModuleServices.CurrentModule;
     if (Module <> nil) and (Module.OwnerCount > 0) then
     begin
+      // D7's IOTAModuleServices has no GetMainProjectGroup - use the shared helper
+      {$IFDEF COMPILER7}
+      MainGroup := GetActiveProjectGroup;
+      {$ELSE}
+      MainGroup := ModuleServices.GetMainProjectGroup;
+      {$ENDIF}
       ActiveProject := GetActiveProject;
       Project := ActiveProject;
-      if Project <> nil then
+      if (Project <> nil) and (MainGroup <> nil) then
       begin
         Found := False;
         { Check if one of the module's projects is the active project }
@@ -313,10 +324,11 @@ begin
           end;
         end;
 
+        {$IFNDEF COMPILER7} // D7's ToolsAPI has no project-dependency interface - the plain active-project check above is all we get
         { Check if one of the module's projects is in the active project's dependency tree }
         if not Found then
         begin
-          if Supports(ModuleServices.GetMainProjectGroup, IOTAProjectGroupProjectDependencies, Dependencies) then
+          if Supports(MainGroup, IOTAProjectGroupProjectDependencies, Dependencies) then
           begin
             DependentProjects := TInterfaceList.Create;
             try
@@ -337,6 +349,7 @@ begin
             end;
           end;
         end;
+        {$ENDIF ~COMPILER7}
 
         { Ask the user to switch the project }
         if not Found then
@@ -347,7 +360,7 @@ begin
                                                        GlobalCompileProgress.AskCompileFromDiffProjectTemporary) of
               mrYes:
                 begin
-                  ModuleServices.GetMainProjectGroup.ActiveProject := Project;
+                  MainGroup.ActiveProject := Project;
                   if GlobalCompileProgress.AskCompileFromDiffProjectTemporary then
                   begin
                     GlobalCompileProgress.AskCompileFromDiffProjectTemporary := False;
@@ -356,7 +369,7 @@ begin
                 end;
               mrRetry:
                 begin
-                  ModuleServices.GetMainProjectGroup.ActiveProject := Project;
+                  MainGroup.ActiveProject := Project;
 
                   AutoClose := Boolean(Services.GetEnvironmentOptions.Values[sOptAutoCloseProgressDlg]);
                   { Compile/Build/Check/... the module's project }
@@ -381,7 +394,7 @@ begin
                   {$IFEND}
 
                   { Restore the last active project so it is also compiled }
-                  ModuleServices.GetMainProjectGroup.ActiveProject := ActiveProject;
+                  MainGroup.ActiveProject := ActiveProject;
 
                   if not GlobalCompileProgress.AskCompileFromDiffProjectTemporary then
                   begin
@@ -393,7 +406,10 @@ begin
                     Exit;
                 end;
               mrCancel:
-                Exit(False);
+                begin
+                  Result := False; // D7 has no Exit(value)
+                  Exit;
+                end;
             end;
             if DontShowAgain then
             begin
@@ -589,8 +605,26 @@ end;
 procedure InitPlugin(Unload: Boolean);
 const
   StartCompileSymbol = '@Comprgrs@TProgressForm@StartCompile$qqrv';
+  {$IFDEF COMPILER7}
+  { Delphi 7 TAppBuilder.ProjectMake prologue (recovered from the 2011 DDevExtensions7.dll):
+      C6 80 78 08 00 00 0B   mov byte ptr [eax+$878],$0b
+      B1 01                  mov cl,1
+      33 D2                  xor edx,edx
+      E8 ?? ?? ?? ??         call CompileActiveProject   <-- offset $0B
+    The call target is the active-project compile routine; redirect it like the
+    Delphi 2009 path does at offset 23. }
+  ProjectMakeCode: array[0..15] of SmallInt = (
+    $C6, $80, $78, $08, $00, $00, $0B,      // mov byte ptr [eax+$00000878],$0b
+    $B1, $01,                               // mov cl,$01
+    $33, $D2,                               // xor edx,edx
+    $E8, -1, -1, -1, -1                     // call CompileActiveProject
+  );
+  {$ENDIF COMPILER7}
 var
   coreideLib: THandle;
+  {$IFDEF COMPILER7}
+  P: PByteArray;
+  {$ENDIF}
 begin
   if not Unload then
   begin
@@ -600,10 +634,31 @@ begin
     @OrgStartCompile := DbgStrictGetProcAddress(coreideLib, StartCompileSymbol);
     if Assigned(OrgStartCompile) then
       @OrgCallStartCompile := RedirectOrgCall(@OrgStartCompile, @HookedStartCompile);
+
+    {$IFDEF COMPILER7}
+    { Hook the "compile the active project" call inside TAppBuilder.ProjectMake so we
+      can offer to switch the active project when compiling a file from another one. }
+    P := Application.MainForm.MethodAddress('ProjectMake');
+    if P <> nil then
+    begin
+      if FindMethodPtr(Cardinal(P), ProjectMakeCode, 1) <> nil then
+      begin
+        if P[$0B] = $E8 then // a last check for changes in ProjectMakeCode
+        begin
+          @OrgCompileActiveProject := Pointer(INT_PTR(@P[$0B + 5]) + PInteger(@P[$0C])^);
+          if Assigned(OrgCompileActiveProject) then
+            @OrgCallCompileActiveProject := RedirectOrgCall(@OrgCompileActiveProject, @CompileActiveProject);
+        end;
+      end;
+    end;
+    {$ENDIF COMPILER7}
   end
   else
   begin
     RestoreOrgCall(@OrgStartCompile, @OrgCallStartCompile);
+    {$IFDEF COMPILER7}
+    RestoreOrgCall(@OrgCompileActiveProject, @OrgCallCompileActiveProject);
+    {$ENDIF COMPILER7}
     GlobalCompileProgress.Free;
   end;
 end;

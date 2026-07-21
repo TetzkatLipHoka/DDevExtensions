@@ -14,6 +14,7 @@ Version: 2.90
 - Added: Compiler Enhancements: "Treat warnings as errors" with exception list (revived from the pre-2009 versions)
 - Added: Compile progress covers the whole project group instead of restarting per project (Delphi 2010 and newer)
 - Added: Project Manager Ctrl+Up/Down moves the project in the build order (Delphi 7; revived)
+- Added: "Ask before compiling a file from a different project" - offers to switch the active project (Delphi 7; revived)
 - Improved: StartParameterTeam also strips the RunParams from .dof/.bdsproj files (pre-2009)
 - Fixed: CompileInterceptor replaced compiler-message texts with the file path
 - Fixed: Random access violation when closing the options dialog (Delphi 2009/2010)

@@ -30,7 +30,6 @@ type
   TDSUFeaturesConfig = class(TPluginConfig)
   private
     FDisablePackageCache: Boolean;
-    //FDisableEditorClearType: Boolean;
     FEditorDblClickAction: TEditorDblClickAction;
     FZoomModeOffset: Integer;
     {$IF CompilerVersion = 21.0} // Delphi 2010
@@ -75,7 +74,6 @@ type
     procedure SetShowAllFrames(const Value: Boolean);
     procedure SetDontBreakOnSpawnedProcesses(const Value: Boolean);
     procedure SetConfirmDlgOnDebugCtrlF1(const Value: Boolean);
-    //procedure SetDisableEditorClearType(Value: Boolean);
     procedure SetDisableAlphaSortClassCompletion(const Value: Boolean);
     procedure SetF12HotKeySupport(const Value: Boolean);
     procedure SetNormalizeLineEndings(const Value: Boolean);
@@ -121,7 +119,6 @@ type
     {$IFEND}
     property ShowFileProjectInPrjMgr: Boolean read FShowFileProjectInPrjMgr write SetShowFileProjectInPrjMgr;
     property EditorDblClickAction: TEditorDblClickAction read FEditorDblClickAction write SetEditorDblClickAction;
-    //property DisableEditorClearType: Boolean read FDisableEditorClearType write SetDisableEditorClearType;
     property StructureViewSearchHotKey: TShortCut read FStructureViewSearchHotKey write SetStructureViewSearchHotKey;
     property DontBreakOnSpawnedProcesses: Boolean read FDontBreakOnSpawnedProcesses write SetDontBreakOnSpawnedProcesses;
     property KillDExplore: Boolean read FKillDExplore write FKillDExplore;
@@ -755,7 +752,6 @@ begin
   if GlobalBaseRegKey <> '' then
   begin
     FDisablePackageCache := RegReadBoolDef(HKEY_CURRENT_USER, GlobalBaseRegKey, 'DDevExDisablePackageCache', False);
-    //FDisableEditorClearType := RegReadBoolDef(HKEY_CURRENT_USER, GlobalBaseRegKey, 'DDevExDisableEditorClearType', False);
   end;
 end;
 
@@ -1578,11 +1574,6 @@ begin
 end;
 
 {----------------------------------------------------------------------------------}
-
-{procedure TDSUFeaturesConfig.SetDisableEditorClearType(Value: Boolean);
-begin
-  SetRegValue(FDisableEditorClearType, Value, 'DDevExDisableEditorClearType');
-end;}
 
 {$IF CompilerVersion >= 21.0} // Rtti-based VirtTreeHandler (2010+)
 procedure TDSUFeaturesConfig.PMGetText(Sender: TObject; Node: PVirtualNode; Column: Integer;

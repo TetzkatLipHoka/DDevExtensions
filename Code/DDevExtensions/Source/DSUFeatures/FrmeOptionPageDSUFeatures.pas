@@ -268,6 +268,11 @@ begin
   HotKeyStructureViewSearch.Enabled := False;
   LabelStructureViewSearchHotkey.Enabled := False;
   {$IFEND}
+  {$IFDEF COMPILER7} // Delphi 7 has no native editor-tab double-click zoom (TEditWindow.TabControlDblClick
+                     // does not exist until Delphi 2005), so there is no zoom-mode field for us to set
+  cbxEditorTabDblClickAction.Enabled := False;
+  lblEditorTabDblClickAction.Enabled := False;
+  {$ENDIF}
 end;
 
 procedure TFrameOptionPageDSUFeatures.SaveData;

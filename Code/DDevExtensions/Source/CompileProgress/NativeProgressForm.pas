@@ -686,6 +686,13 @@ begin
     HookedStartCompile after a successful compile. }
   if (FAutoCloseCheckBox <> nil) or (Form = nil) then
     Exit;
+  {$IF CompilerVersion >= 33.0}
+  // The redesigned compile dialog (10.3 Rio+) already has its own native
+  // "close on successful compile" checkbox, so injecting ours only produces a
+  // second, overlapping checkbox. The env option is reachable via that native
+  // checkbox (and Tools > Options), so we no longer add one here.
+  Exit;
+  {$IFEND}
   {$IF CompilerVersion >= 20.0}
   try
     Value := (BorlandIDEServices as IOTAServices).GetEnvironmentOptions.Values['AutoCloseProgressDlg'];

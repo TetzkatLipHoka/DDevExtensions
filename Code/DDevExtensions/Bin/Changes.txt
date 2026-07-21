@@ -22,6 +22,7 @@ Version: 2.90
 - Fixed: "Extended Home" read past the end of short lines (exception in the 64-bit IDE)
 - Fixed: Compile progress bar stayed at 0% when a (re)build had nothing to compile
 - Fixed: OnAfterCompile did not fire on pre-2010 IDEs (Delphi 7/2009), so "auto-save on successful compile" did nothing
+- Fixed: Duplicate "close on successful compile" checkbox overlapped the native one in the redesigned compile dialog (Delphi 10.3 Rio and newer)
 
 Version: 2.89
 =============

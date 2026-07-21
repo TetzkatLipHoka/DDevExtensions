@@ -21,6 +21,7 @@ Version: 2.90
 - Fixed: Access violation on closing the IDE after a debug session (notifier teardown with a gone BorlandIDEServices)
 - Fixed: "Extended Home" read past the end of short lines (exception in the 64-bit IDE)
 - Fixed: Compile progress bar stayed at 0% when a (re)build had nothing to compile
+- Fixed: OnAfterCompile did not fire on pre-2010 IDEs (Delphi 7/2009), so "auto-save on successful compile" did nothing
 
 Version: 2.89
 =============

@@ -176,8 +176,26 @@ begin
 end;
 
 procedure TIDENotifierList.AfterCompile(Succeeded, IsCodeInsight: Boolean);
+{$IF CompilerVersion < 21.0}
+{ IOTAIDENotifier80 (the AfterCompile WITH a Project) is only implemented from
+  Delphi 2010 on, so pre-2010 IDEs - including Delphi 7 - call THIS
+  IOTAIDENotifier50 variant instead. Dispatch OnAfterCompile here (using the
+  active project) or it would never fire on those versions, breaking e.g.
+  "auto-save on successful compile". BeforeCompile already dispatches from its
+  IOTAIDENotifier50 variant, so it was unaffected. 2010+ keeps this empty and
+  dispatches from the IOTAIDENotifier80 method below. }
+var
+  I: Integer;
+  Project: IOTAProject;
+begin
+  Project := GetActiveProject;
+  for I := 0 to NotifierCount - 1 do
+    Notifiers[I].AfterCompile(Project, Succeeded, IsCodeInsight);
+end;
+{$ELSE}
 begin
 end;
+{$IFEND}
 
 procedure TIDENotifierList.BeforeCompile(const Project: IOTAProject;
   IsCodeInsight: Boolean; var Cancel: Boolean);

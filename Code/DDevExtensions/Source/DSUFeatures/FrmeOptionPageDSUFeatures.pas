@@ -272,6 +272,9 @@ begin
                      // does not exist until Delphi 2005), so there is no zoom-mode field for us to set
   cbxEditorTabDblClickAction.Enabled := False;
   lblEditorTabDblClickAction.Enabled := False;
+  // DisablePackageCache patches Pascpppakmgr/Comppalmgr in delphicoreide - Galileo (2005+)
+  // units that do not exist in Delphi 7, so the InjectCode calls resolve to nil and no-op
+  chkDisablePackageCache.Enabled := False;
   {$ENDIF}
 end;
 

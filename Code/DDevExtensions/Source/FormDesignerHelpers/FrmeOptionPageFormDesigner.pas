@@ -112,8 +112,10 @@ end;
 
 procedure TFrameOptionPageFormDesigner.cbxActiveClick(Sender: TObject);
 begin
-  cbxLabelMargin.Enabled := cbxActive.Checked;
-  chkRemoveExplicitProperties.Enabled := cbxActive.Checked;
+  // LabelMarginHelper and RemoveExplicitProperty are whole-unit {$IFDEF COMPILER10_UP}
+  // (empty on Delphi 7), so their hooks do nothing there - grey the controls out
+  cbxLabelMargin.Enabled := {$IFDEF COMPILER10_UP}cbxActive.Checked{$ELSE}False{$ENDIF};
+  chkRemoveExplicitProperties.Enabled := {$IFDEF COMPILER10_UP}cbxActive.Checked{$ELSE}False{$ENDIF};
   chkRemovePixelsPerInchProperties.Enabled := {$IFDEF DELPHI28_UP}cbxActive.Checked{$ELSE}False{$ENDIF};
   chkRemoveTextHeightProperty.Enabled := {$IFDEF DELPHI28_UP}cbxActive.Checked{$ELSE}False{$ENDIF};
   chkFixAlphaControlsPNG.Enabled := {$IFDEF INCLUDE_ACPNGFIX}cbxActive.Checked{$ELSE}False{$ENDIF};

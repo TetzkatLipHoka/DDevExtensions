@@ -13,7 +13,7 @@ inherited FormTreePages: TFormTreePages
   TextHeight = 13
   object PanelButtons: TPanel
     Left = 0
-    Top = 403
+    Top = 429
     Width = 701
     Height = 37
     Align = alBottom
@@ -51,7 +51,7 @@ inherited FormTreePages: TFormTreePages
     Left = 0
     Top = 0
     Width = 701
-    Height = 403
+    Height = 429
     Align = alClient
     BevelOuter = bvNone
     BorderWidth = 5
@@ -60,7 +60,7 @@ inherited FormTreePages: TFormTreePages
       Left = 5
       Top = 5
       Width = 177
-      Height = 393
+      Height = 419
       Align = alLeft
       HideSelection = False
       Indent = 19
@@ -74,7 +74,7 @@ inherited FormTreePages: TFormTreePages
       Left = 182
       Top = 5
       Width = 514
-      Height = 393
+      Height = 419
       Align = alClient
       BevelOuter = bvNone
       TabOrder = 1

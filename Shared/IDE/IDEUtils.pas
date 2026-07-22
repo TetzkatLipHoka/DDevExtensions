@@ -237,8 +237,8 @@ implementation
 uses
   Registry, IDEHooks;
 
-{$IF CompilerVersion < 18.5}
-// Pre-Delphi 2007 (e.g. Delphi 7) has no NativeInt/NativeUInt. On the 32-bit
+{$IF CompilerVersion < 21}
+// Pre-Delphi 2010 (e.g. Delphi 7) has no NativeInt/NativeUInt. On the 32-bit
 // x86 compilers these types are pointer-sized, i.e. Integer/Cardinal.
 type
   NativeInt = Integer;

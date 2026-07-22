@@ -276,7 +276,10 @@ procedure TFormTreePages.PopulateTreeNodes;
       );
     end;
   end;
-
+{$IF NOT Declared( USER_DEFAULT_SCREEN_DPI )}
+const
+  USER_DEFAULT_SCREEN_DPI = 96;
+{$IFEND}
 var
   i: Integer;
   LHeight : Integer;

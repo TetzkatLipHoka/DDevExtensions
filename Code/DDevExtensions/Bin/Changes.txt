@@ -10,7 +10,7 @@ Version: 2.90
 - Added: "Prefer proper PNG over AlphaControls" - arbitrates the VCL graphic-format registration order so the proper TPNGGraphic wins over acPNG's fake PNG
 - Added: "Provide PNG support in the IDE" - registers the bundled pngimage on pre-2009 IDEs that have no PNG package installed
 - Added: Normalize line endings to CRLF when a file is opened (optional; LF-only files confuse parts of the IDE)
-- Added: "Automatically close on successful compile" checkbox in the compile progress dialog (revived from the pre-2009 versions)
+- Added: "Automatically close on successful compile" checkbox in the compile progress dialog (pre-2009 IDEs only; 2009 and newer already have one)
 - Added: Compiler Enhancements: "Treat warnings as errors" with exception list (revived from the pre-2009 versions)
 - Added: Compile progress covers the whole project group instead of restarting per project (Delphi 2010 and newer)
 - Added: Project Manager Ctrl+Up/Down moves the project in the build order (Delphi 7; revived)
@@ -22,7 +22,7 @@ Version: 2.90
 - Fixed: "Extended Home" read past the end of short lines (exception in the 64-bit IDE)
 - Fixed: Compile progress bar stayed at 0% when a (re)build had nothing to compile
 - Fixed: OnAfterCompile did not fire on pre-2010 IDEs (Delphi 7/2009), so "auto-save on successful compile" did nothing
-- Fixed: Duplicate "close on successful compile" checkbox overlapped the native one in the redesigned compile dialog (Delphi 10.3 Rio and newer)
+- Fixed: Duplicate "close on successful compile" checkbox next to the IDE's own one (Delphi 2009 and newer)
 
 Version: 2.89
 =============

@@ -669,50 +669,32 @@ begin
 end;
 
 procedure TNativeProgressForm.CreateAutoCloseCheckBox(Form: TCustomForm);
-{$IF CompilerVersion >= 20.0}
-var
-  Value: Variant;
-{$IFEND}
-{$IF CompilerVersion < 33.0}
+{$IF CompilerVersion < 20.0}
 var
   Btn: TButton;
 {$IFEND}
 begin
   { Injects an "Automatically close on successful compile" checkbox into the
     IDE's compile progress dialog (bottom left, same row as the progress bar).
-    2009+: toggles the IDE's AutoCloseProgressDlg environment option.
-    Pre-2009 IDEs have no such option (the dialog always waits for OK), so
-    DDevExtensions persists the setting itself and closes the dialog in
-    HookedStartCompile after a successful compile. }
+    Pre-2009 IDEs have no AutoCloseProgressDlg option (the dialog always waits
+    for OK), so DDevExtensions persists the setting itself and closes the dialog
+    in HookedStartCompile after a successful compile. }
   if (FAutoCloseCheckBox <> nil) or (Form = nil) then
     Exit;
-  {$IF CompilerVersion >= 33.0}
-  // The redesigned compile dialog (10.3 Rio+) already has its own native
-  // "close on successful compile" checkbox, so injecting ours only produces a
-  // second, overlapping checkbox. The env option is reachable via that native
-  // checkbox (and Tools > Options), so we no longer add one here.
-  Exit;
-  {$IFEND}
   {$IF CompilerVersion >= 20.0}
-  try
-    Value := (BorlandIDEServices as IOTAServices).GetEnvironmentOptions.Values['AutoCloseProgressDlg'];
-    if VarIsNull(Value) or VarIsEmpty(Value) then
-      Exit;
-    FCachedAutoClose := Boolean(Value);
-  except
-    Exit; // option unknown to this IDE - do not offer the checkbox
-  end;
+  // 2009+ IDEs already offer this themselves: they have the AutoCloseProgressDlg
+  // environment option and their own native "close on successful compile"
+  // checkbox in the compile dialog (confirmed on 2009 and on the redesigned
+  // 10.3 Rio+ dialog), so injecting ours only produces a second, redundant
+  // checkbox. The option stays reachable natively and via Tools > Options.
+  Exit;
   {$ELSE}
   FCachedAutoClose := FAutoCloseFallback;
-  {$IFEND}
 
   FAutoCloseCheckBox := TCheckBox.Create(Form);
   FAutoCloseCheckBox.FreeNotification(Self);
   FAutoCloseCheckBox.Name := 'DDevExtensions_AutoClose';
   FAutoCloseCheckBox.Caption := sAutoCloseCaption;
-  {$IF CompilerVersion >= 33.0} // new progress dialog: place below the labels, left of our progress bar
-  FAutoCloseCheckBox.SetBounds(8, Form.ClientHeight - 27, Form.ClientWidth - 200, 17);
-  {$ELSE}
   // half width + two lines so it does not overlap the OK button, vertically
   // centered on the button row
   {$IF CompilerVersion >= 18.0}
@@ -725,7 +707,6 @@ begin
   else
     FAutoCloseCheckBox.SetBounds(8, Form.ClientHeight - 4 - 34 - 25 {$IFDEF COMPILER10_UP}- 20{$ENDIF},
       (Form.ClientWidth - {$IFDEF IDE50_UP}120{$ELSE}80{$ENDIF} - 24) div 2, 34);
-  {$IFEND}
   FAutoCloseCheckBox.Checked := FCachedAutoClose;
   FAutoCloseCheckBox.OnClick := DoAutoCloseClick;
   FAutoCloseCheckBox.Parent := Form;
@@ -735,7 +716,6 @@ begin
     GetWindowLong(FAutoCloseCheckBox.Handle, GWL_STYLE) or BS_MULTILINE);
   {$IFEND}
 
-  {$IF CompilerVersion < 20.0}
   if FAutoCloseTimer = nil then
   begin
     FAutoCloseTimer := TTimer.Create(Self);

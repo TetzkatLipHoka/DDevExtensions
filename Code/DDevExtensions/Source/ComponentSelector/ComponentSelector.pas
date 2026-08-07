@@ -586,7 +586,16 @@ end;
 
 procedure TComponentSelector.SetHotkey(const Value: TShortCut);
 begin
-  FHotkeyAction.ShortCut := Value;
+  // A global IDE-action hotkey without a Ctrl/Alt modifier hijacks that bare key
+  // in every context: a stray Backspace here (easily set via the THotKey
+  // "press-to-clear" trap) swallowed Backspace in dialogs like Evaluate/Modify
+  // while the code editor stayed fine. Refuse bare shortcuts so the action never
+  // grabs a plain editing key. GetHotkey reads this back, so a rejected value
+  // also heals itself in the registry on the next save.
+  if (Value <> 0) and ((Value and (scCtrl or scAlt)) = 0) then
+    FHotkeyAction.ShortCut := 0
+  else
+    FHotkeyAction.ShortCut := Value;
 end;
 
 procedure TComponentSelector.ExecuteHotkeyAction(Sender: TObject);

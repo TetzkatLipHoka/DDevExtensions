@@ -21,7 +21,7 @@ var
 
 uses
   Windows, SysUtils, Classes, Contnrs, Controls, Forms, StdCtrls, ExtCtrls, ImgList,
-  Graphics, ActnList, Math,
+  Graphics, ActnList, Math, Menus,
   EditPopupCtrl, VirtTreeHandler, ToolsAPI, StructureViewAPI;
 
 type
@@ -331,6 +331,10 @@ end;
 
 procedure TStructureViewSearch.SetHotkey(AHotkey: TShortCut);
 begin
+  // Refuse a bare (no Ctrl/Alt) hotkey - a global action shortcut on a plain
+  // editing key would hijack it in every context (see ComponentSelector.SetHotkey).
+  if (AHotkey <> 0) and ((AHotkey and (scCtrl or scAlt)) = 0) then
+    AHotkey := 0;
   if AHotkey = 0 then
     FreeAndNil(FHotkeyAction)
   else

@@ -14,7 +14,7 @@ const
   {$I Version.inc}
 
   sPluginVersion = VersionNumber;
-  sPluginName = 'DDevExtensions ' + sPluginVersion;
+  sPluginName = 'DDevExtensions ' + sPluginVersion + ' [' + VersionBuildStamp + ']';
   sPluginSmallCopyright = '(C) 2006-2026 Andreas Hausladen';
   sPluginCopyright = 'Copyright ' + sPluginSmallCopyright;
 

@@ -1,10 +1,10 @@
 inherited FrameOptionPageDSUFeatures: TFrameOptionPageDSUFeatures
   Width = 385
-  Height = 414
+  Height = 440
   TabStop = True
   inherited pnlClient: TPanel
     Width = 385
-    Height = 365
+    Height = 391
     object lblEditorTabDblClickAction: TLabel
       Left = 8
       Top = 216
@@ -180,6 +180,22 @@ inherited FrameOptionPageDSUFeatures: TFrameOptionPageDSUFeatures
       ParentShowHint = False
       ShowHint = True
       TabOrder = 15
+    end
+    object chkDisableWelcomePageFeed: TCheckBox
+      Left = 8
+      Top = 366
+      Width = 369
+      Height = 17
+      Hint = 
+        'The welcome page fetches a news feed on startup. If that fetch fa' +
+        'ils - blocked'#13#10'by a firewall, or a feed URL that has gone dead - ' +
+        'the fetcher crashes with an'#13#10'access violation on every IDE start.' +
+        ' This keeps the IDE from loading the'#13#10'package at all; the welcome' +
+        ' page itself stays, only the feed card is gone.'
+      Caption = 'Don'#39't load the Welcome Page feed package (needs IDE restart)'
+      ParentShowHint = False
+      ShowHint = True
+      TabOrder = 16
     end
   end
   inherited pnlDescription: TPanel

@@ -97,6 +97,7 @@ uses
   NormalizeLineEndings in '..\Source\Editor\NormalizeLineEndings.pas',
   DisableAlphaSortClassCompletion in '..\Source\DSUFeatures\DisableAlphaSortClassCompletion.pas',
   F12HotKeySupport in '..\Source\DSUFeatures\F12HotKeySupport.pas',
+  DisableWelcomePageFeed in '..\Source\DSUFeatures\DisableWelcomePageFeed.pas',
   RemoveTextHeightProperty in '..\Source\FormDesignerHelpers\RemoveTextHeightProperty.pas',
   RemovePixelsPerInchProperty in '..\Source\FormDesignerHelpers\RemovePixelsPerInchProperty.pas',
   FixAlphaControlsPNG in '..\Source\FormDesignerHelpers\FixAlphaControlsPNG.pas',

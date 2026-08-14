@@ -54,6 +54,7 @@ type
     FDisableAlphaSortClassCompletion: Boolean;
     FF12HotKeySupport: Boolean;
     FNormalizeLineEndings: Boolean;
+    FDisableWelcomePageFeed: Boolean;
 
     procedure SetDisablePackageCache(Value: Boolean);
     procedure SetEditorDblClickAction(Value: TEditorDblClickAction);
@@ -77,6 +78,7 @@ type
     procedure SetDisableAlphaSortClassCompletion(const Value: Boolean);
     procedure SetF12HotKeySupport(const Value: Boolean);
     procedure SetNormalizeLineEndings(const Value: Boolean);
+    procedure SetDisableWelcomePageFeed(const Value: Boolean);
   protected
     FTimerStructureView: TTimer;
     FLastParsingDots: Integer;
@@ -126,6 +128,7 @@ type
     property DisableAlphaSortClassCompletion: Boolean read FDisableAlphaSortClassCompletion write SetDisableAlphaSortClassCompletion;
     property F12HotKeySupport: Boolean read FF12HotKeySupport write SetF12HotKeySupport;
     property NormalizeLineEndings: Boolean read FNormalizeLineEndings write SetNormalizeLineEndings;
+    property DisableWelcomePageFeed: Boolean read FDisableWelcomePageFeed write SetDisableWelcomePageFeed;
   end;
 
   TFrameOptionPageDSUFeatures = class(TFrameBase, ITreePageComponent)
@@ -147,6 +150,7 @@ type
     chkAutoCloseCompileDlg: TCheckBox;
     chkF12HotKeySupport: TCheckBox;
     chkNormalizeLineEndings: TCheckBox;
+    chkDisableWelcomePageFeed: TCheckBox;
   private
     { Private-Deklarationen }
     FDSUFeatures: TDSUFeaturesConfig;
@@ -168,7 +172,8 @@ implementation
 
 uses
   Main, DSUFeatures, StrUtils, IDEHooks, Hooking, IDEUtils, StrucViewSearch, ToolsAPIHelpers,
-  AppConsts, DisableAlphaSortClassCompletion, F12HotKeySupport, NormalizeLineEndings, CompileProgress;
+  AppConsts, DisableAlphaSortClassCompletion, F12HotKeySupport, NormalizeLineEndings, CompileProgress,
+  DisableWelcomePageFeed;
 
 {$R *.dfm}
 
@@ -241,6 +246,10 @@ begin
   chkDisableAlphaSortClassCompletion.Checked := FDSUFeatures.DisableAlphaSortClassCompletion;
   chkF12HotKeySupport.Checked := FDSUFeatures.F12HotKeySupport;
   chkNormalizeLineEndings.Checked := FDSUFeatures.NormalizeLineEndings;
+  chkDisableWelcomePageFeed.Checked := FDSUFeatures.DisableWelcomePageFeed;
+  {$IF CompilerVersion < 35.0} // pre-Delphi 11: no separate feed package, the whole start page goes
+  chkDisableWelcomePageFeed.Caption := 'Don''t load the Start Page package (needs IDE restart)';
+  {$IFEND}
 
   {$IF CompilerVersion < 20.0}
   // mirror of the checkbox injected into the compile progress dialog - with
@@ -259,6 +268,7 @@ begin
   chkShowAllFrames.Enabled := False;
   chkReplaceOpenFileAtCursor.Enabled := False;
   chkDisableCodeFolding.Enabled := False; // code folding itself is 2005+, the hook 2009-only
+  chkDisableWelcomePageFeed.Enabled := False; // Delphi 7 registers no start page package at all
   {$IFEND}
   {$IF CompilerVersion < 21.0} // pre-2010: Rtti-based VirtTreeHandler/StructureViewAPI stubs
   chkShowFileProjectInPrjMgr.Enabled := False;
@@ -298,6 +308,7 @@ begin
   FDSUFeatures.DisableAlphaSortClassCompletion := chkDisableAlphaSortClassCompletion.Checked;
   FDSUFeatures.F12HotKeySupport := chkF12HotKeySupport.Checked;
   FDSUFeatures.NormalizeLineEndings := chkNormalizeLineEndings.Checked;
+  FDSUFeatures.DisableWelcomePageFeed := chkDisableWelcomePageFeed.Checked;
   FDSUFeatures.Save;
 
   {$IF CompilerVersion < 20.0}
@@ -753,6 +764,8 @@ begin
   begin
     FDisablePackageCache := RegReadBoolDef(HKEY_CURRENT_USER, GlobalBaseRegKey, 'DDevExDisablePackageCache', False);
   end;
+  // the package list is the state - the XML copy is only there for the options dialog
+  FDisableWelcomePageFeed := WelcomePageFeedDisabled;
 end;
 
 procedure TDSUFeaturesConfig.SetRegValue(var Value: Boolean; NewValue: Boolean; const ValueName: string);
@@ -1570,6 +1583,17 @@ begin
   begin
     FNormalizeLineEndings := Value;
     InstallNormalizeLineEndings(FNormalizeLineEndings);
+  end;
+end;
+
+procedure TDSUFeaturesConfig.SetDisableWelcomePageFeed(const Value: Boolean);
+begin
+  if Value <> FDisableWelcomePageFeed then
+  begin
+    FDisableWelcomePageFeed := Value;
+    // not while loading: Loaded reads the live package list back over the XML
+    if not Loading then
+      SetWelcomePageFeedDisabled(Value);
   end;
 end;
 

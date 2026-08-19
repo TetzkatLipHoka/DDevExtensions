@@ -55,6 +55,7 @@ type
     FF12HotKeySupport: Boolean;
     FNormalizeLineEndings: Boolean;
     FDisableWelcomePageFeed: Boolean;
+    FDisableDebugHeap: Boolean;
 
     procedure SetDisablePackageCache(Value: Boolean);
     procedure SetEditorDblClickAction(Value: TEditorDblClickAction);
@@ -79,6 +80,7 @@ type
     procedure SetF12HotKeySupport(const Value: Boolean);
     procedure SetNormalizeLineEndings(const Value: Boolean);
     procedure SetDisableWelcomePageFeed(const Value: Boolean);
+    procedure SetDisableDebugHeap(const Value: Boolean);
   protected
     FTimerStructureView: TTimer;
     FLastParsingDots: Integer;
@@ -129,6 +131,7 @@ type
     property F12HotKeySupport: Boolean read FF12HotKeySupport write SetF12HotKeySupport;
     property NormalizeLineEndings: Boolean read FNormalizeLineEndings write SetNormalizeLineEndings;
     property DisableWelcomePageFeed: Boolean read FDisableWelcomePageFeed write SetDisableWelcomePageFeed;
+    property DisableDebugHeap: Boolean read FDisableDebugHeap write SetDisableDebugHeap;
   end;
 
   TFrameOptionPageDSUFeatures = class(TFrameBase, ITreePageComponent)
@@ -151,6 +154,7 @@ type
     chkF12HotKeySupport: TCheckBox;
     chkNormalizeLineEndings: TCheckBox;
     chkDisableWelcomePageFeed: TCheckBox;
+    chkDisableDebugHeap: TCheckBox;
   private
     { Private-Deklarationen }
     FDSUFeatures: TDSUFeaturesConfig;
@@ -173,7 +177,7 @@ implementation
 uses
   Main, DSUFeatures, StrUtils, IDEHooks, Hooking, IDEUtils, StrucViewSearch, ToolsAPIHelpers,
   AppConsts, DisableAlphaSortClassCompletion, F12HotKeySupport, NormalizeLineEndings, CompileProgress,
-  DisableWelcomePageFeed;
+  DisableWelcomePageFeed, DisableDebugHeap;
 
 {$R *.dfm}
 
@@ -247,6 +251,7 @@ begin
   chkF12HotKeySupport.Checked := FDSUFeatures.F12HotKeySupport;
   chkNormalizeLineEndings.Checked := FDSUFeatures.NormalizeLineEndings;
   chkDisableWelcomePageFeed.Checked := FDSUFeatures.DisableWelcomePageFeed;
+  chkDisableDebugHeap.Checked := FDSUFeatures.DisableDebugHeap;
   {$IF CompilerVersion < 35.0} // pre-Delphi 11: no separate feed package, the whole start page goes
   chkDisableWelcomePageFeed.Caption := 'Don''t load the Start Page package (needs IDE restart)';
   {$IFEND}
@@ -309,6 +314,7 @@ begin
   FDSUFeatures.F12HotKeySupport := chkF12HotKeySupport.Checked;
   FDSUFeatures.NormalizeLineEndings := chkNormalizeLineEndings.Checked;
   FDSUFeatures.DisableWelcomePageFeed := chkDisableWelcomePageFeed.Checked;
+  FDSUFeatures.DisableDebugHeap := chkDisableDebugHeap.Checked;
   FDSUFeatures.Save;
 
   {$IF CompilerVersion < 20.0}
@@ -1594,6 +1600,15 @@ begin
     // not while loading: Loaded reads the live package list back over the XML
     if not Loading then
       SetWelcomePageFeedDisabled(Value);
+  end;
+end;
+
+procedure TDSUFeaturesConfig.SetDisableDebugHeap(const Value: Boolean);
+begin
+  if Value <> FDisableDebugHeap then
+  begin
+    FDisableDebugHeap := Value;
+    InstallDisableDebugHeap(FDisableDebugHeap);
   end;
 end;
 

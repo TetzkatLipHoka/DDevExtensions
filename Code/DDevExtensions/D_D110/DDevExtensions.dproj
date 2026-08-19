@@ -295,6 +295,7 @@ $(PreBuildEvent)]]></PreBuildEvent>
             <Form>FrameOptionPageCompilerEnhancements</Form>
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
+        <DCCReference Include="..\Source\DSUFeatures\DisableDebugHeap.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

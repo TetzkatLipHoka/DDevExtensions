@@ -1,10 +1,10 @@
 inherited FrameOptionPageDSUFeatures: TFrameOptionPageDSUFeatures
   Width = 385
-  Height = 440
+  Height = 463
   TabStop = True
   inherited pnlClient: TPanel
     Width = 385
-    Height = 391
+    Height = 414
     object lblEditorTabDblClickAction: TLabel
       Left = 8
       Top = 216
@@ -196,6 +196,22 @@ inherited FrameOptionPageDSUFeatures: TFrameOptionPageDSUFeatures
       ParentShowHint = False
       ShowHint = True
       TabOrder = 16
+    end
+    object chkDisableDebugHeap: TCheckBox
+      Left = 8
+      Top = 389
+      Width = 369
+      Height = 17
+      Hint = 
+        'Windows turns on heap validation for a process it debugs, which mak' +
+        'es'#13#10'allocation-heavy code an order of magnitude slower - a first Open' +
+        ' dialog'#13#10'can freeze for seconds. This passes _NO_DEBUG_HEAP=1 to the d' +
+        'ebugged'#13#10'process, the same switch Visual Studio offers. Note that it a' +
+        'lso gives up'#13#10'the heap misuse detection the debug heap provides.'
+      Caption = 'Disable the Windows debug heap for debugged processes'
+      ParentShowHint = False
+      ShowHint = True
+      TabOrder = 17
     end
   end
   inherited pnlDescription: TPanel

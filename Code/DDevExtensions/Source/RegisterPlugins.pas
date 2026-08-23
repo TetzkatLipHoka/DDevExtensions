@@ -21,6 +21,9 @@ uses
   {$IF CompilerVersion < 21.0} // pre-2010 only (PM was rebuilt in RAD Studio 2010)
   ProjectMgrShortCuts,
   {$IFEND}
+  {$IF CompilerVersion < 16.0} // Delphi 7: shield against BDS-written .dsk files
+  SkipForeignDsk,
+  {$IFEND}
   FrmeOptionPageFormDesigner,
   FrmProjectSettingsSetVersioninfo, FocusEditor, CompileProgress,
   IDEMenuHandler, FrmeOptionPageKeybindings,
@@ -52,6 +55,13 @@ begin
   try
     if DisabledPlugins.IndexOf('DSUFeatures') = -1 then
       RegisterLateLoader(FrmeOptionPageDSUFeatures.InitPlugin);
+
+    {$IF CompilerVersion < 16.0} // Delphi 7: a .dsk written by a newer IDE hangs the
+    // project open, which happens BEFORE the late loaders run (splash) - so this
+    // must go through the early expert loader
+    if DisabledPlugins.IndexOf('SkipForeignDsk') = -1 then
+      RegisterExpertLoader(SkipForeignDsk.InitPlugin);
+    {$IFEND}
 
     {$IFDEF INCLUDE_FOCUSEDITOR}
     if DisabledPlugins.IndexOf('FocusEditor') = -1 then

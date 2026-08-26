@@ -361,7 +361,10 @@ begin { SaveToStream }
           if Length(wValue) > 0 then
             SaveVersionHeader (stringInfoStream, 0, Length (strg.fValue) + 1, 1, fChildStrings [i], wValue [1])
           else
-            SaveVersionHeader (stringInfoStream, 0, Length (strg.fValue) + 1, 0, fChildStrings [i], PChar(wValue)^);
+            // empty value: wValue is an empty (= nil) WideString, so PChar(wValue)^
+            // dereferenced address 0 and the stream write AVed - pass a real
+            // zero buffer instead (same single 0 byte in the output as intended)
+            SaveVersionHeader (stringInfoStream, 0, Length (strg.fValue) + 1, 0, fChildStrings [i], zeros);
           wSize := stringInfoStream.Size - p;
           stringInfoStream.Seek (p, soFromBeginning);
           stringInfoStream.Write (wSize, sizeof (wSize));

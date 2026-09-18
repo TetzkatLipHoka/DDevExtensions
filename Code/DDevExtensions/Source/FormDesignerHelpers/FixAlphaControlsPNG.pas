@@ -29,6 +29,7 @@ type
   protected
     procedure WriteData(Stream: TStream); override;
   public
+    destructor Destroy; override;
     procedure LoadFromStream(Stream: TStream); override;
   end;
 
@@ -41,10 +42,85 @@ implementation
 {$IFDEF INCLUDE_ACPNGFIX}
 uses
   {$IFNDEF COMPILER12_UP}SysUtils, FileFormatsListHack,{$ENDIF}
-  pnglang;
+  ExtCtrls, IDEUtils, pnglang;
 {$ENDIF}
 
 {$IFDEF INCLUDE_ACPNGFIX}
+
+{
+  Swapping the converter instance out of the TPicture after the load
+  ------------------------------------------------------------------
+  Converting on save is not enough: between load and save the TPicture holds
+  an instance of THIS class, and when the IDE adds the units a form needs it
+  takes the graphic's class unit from RTTI - i.e. "FixAlphaControlsPNG", a unit
+  that only exists inside the expert DLL, so the project no longer compiles.
+  Only after a full reload of the form (now streamed as 'TPngImage') does the
+  IDE pick the right unit.
+
+  So right after the converter has loaded, the picture's graphic is replaced
+  by a plain instance of the parent class (TPngImage from the real pngimage
+  unit). The owning TPicture is reachable through OnChange (its Data is the
+  picture), but TPicture only assigns OnChange AFTER ReadData returns - hence
+  the swap is queued and done on the next timer tick from the message loop.
+  Instances that die before the tick (load failure, form closed) unregister
+  themselves in the destructor, so the queue only ever holds live objects.
+  The swap does not mark the form modified - as before, the file changes on
+  the next save only.
+}
+
+var
+  PendingSwaps: TList;   // live converter instances waiting for the swap
+  SwapTimer: TTimer;
+
+procedure SwapTimerTick(Data: TObject; Sender: TObject);
+var
+  G: TPNGGraphic;
+  Pic: TPicture;
+  Proper: TGraphic;
+begin
+  SwapTimer.Enabled := False;
+  while PendingSwaps.Count > 0 do
+  begin
+    G := TPNGGraphic(PendingSwaps[0]);
+    PendingSwaps.Delete(0);
+    if Assigned(G.OnChange) and (TObject(TMethod(G.OnChange).Data) is TPicture) then
+    begin
+      Pic := TPicture(TMethod(G.OnChange).Data);
+      if Pic.Graphic = G then
+      begin
+        Proper := TGraphicClass(G.ClassParent).Create;
+        try
+          Proper.Assign(G);
+          Pic.Graphic := Proper; // TPicture copies it as a parent-class instance and frees G
+        finally
+          Proper.Free;
+        end;
+      end;
+    end;
+  end;
+end;
+
+procedure QueueSwap(G: TPNGGraphic);
+begin
+  if PendingSwaps = nil then
+    PendingSwaps := TList.Create;
+  if SwapTimer = nil then
+  begin
+    SwapTimer := TTimer.Create(nil);
+    SwapTimer.Interval := 50;
+    SwapTimer.OnTimer := MakeNotifyEvent(nil, @SwapTimerTick);
+  end;
+  if PendingSwaps.IndexOf(G) = -1 then
+    PendingSwaps.Add(G);
+  SwapTimer.Enabled := True;
+end;
+
+destructor TPNGGraphic.Destroy;
+begin
+  if PendingSwaps <> nil then
+    PendingSwaps.Remove(Self);
+  inherited Destroy;
+end;
 
 {
   acPNG (AlphaControls) DFM stream layout that LoadFromStream below parses
@@ -101,9 +177,10 @@ begin
         break;
         end;
       end;
-    if found then 
+    if found then
       begin
       inherited LoadFromStream( Stream );
+      QueueSwap(Self);
       Exit;
       end;
     end;
@@ -166,6 +243,7 @@ begin
       bmp.free;
 
       Changed(Self);
+      QueueSwap(Self);
       Exit;
       end;
     end;
@@ -283,6 +361,12 @@ begin
     {$ENDIF}
   end;
 end;
+
+initialization
+
+finalization
+  SwapTimer.Free;
+  PendingSwaps.Free;
 
 {$ENDIF}
 
